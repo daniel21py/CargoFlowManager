@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ const STATI_COLORS = {
 
 export default function Spedizioni() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStato, setFilterStato] = useState<string>("ALL");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -43,6 +45,39 @@ export default function Spedizioni() {
     giroId: null,
     note: "",
   });
+
+  // Check for prefilled data from import DDT via localStorage (more reliable than history state)
+  useEffect(() => {
+    const prefilledData = localStorage.getItem('ddtImportData');
+    if (prefilledData) {
+      try {
+        const data = JSON.parse(prefilledData);
+        
+        // Auto-populate form with imported DDT data
+        setFormData(prev => ({
+          ...prev,
+          dataDDT: data.dataDDT || prev.dataDDT,
+          numeroDDT: data.numeroDDT || prev.numeroDDT,
+          colli: data.colli || prev.colli,
+          pesoKg: data.peso?.toString() || prev.pesoKg,
+          contrassegno: data.contrassegno || prev.contrassegno,
+        }));
+        
+        setIsDialogOpen(true);
+        
+        // Clear the localStorage data after using it
+        localStorage.removeItem('ddtImportData');
+        
+        toast({
+          title: "Dati importati",
+          description: "I dati del DDT sono stati precompilati. Completa i campi mancanti e salva.",
+        });
+      } catch (error) {
+        console.error('Errore parsing dati importati:', error);
+        localStorage.removeItem('ddtImportData');
+      }
+    }
+  }, [toast]);
 
   const { data: spedizioni, isLoading } = useQuery<SpedizioneWithDetails[]>({
     queryKey: ["/api/spedizioni"],

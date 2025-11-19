@@ -1,4 +1,4 @@
-import { Home, Truck, Users, Package, Calendar, Building2, MapPin, UserCircle, LogOut } from "lucide-react";
+import { Home, Truck, Users, Package, Calendar, Building2, MapPin, UserCircle, LogOut, FileUp } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +25,11 @@ const menuItems = [
     title: "Spedizioni",
     url: "/spedizioni",
     icon: Package,
+  },
+  {
+    title: "Importa DDT",
+    url: "/importa-ddt",
+    icon: FileUp,
   },
   {
     title: "Pianificazione",

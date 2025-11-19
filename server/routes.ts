@@ -2,6 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getStorage } from "./storage";
 import { insertCommittenteSchema, insertDestinatarioSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema, updateSpedizioneStatoSchema } from "@shared/schema";
+import multer from "multer";
+import { extractTextFromDDT } from "./ocr-service";
+import { parseDDTWithAI } from "./ai-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -304,6 +307,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(spedizione);
     } catch (error) {
       res.status(400).json({ error: "Errore nell'aggiornamento stato" });
+    }
+  });
+
+  // Import DDT route - OCR + AI processing
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // Max 10MB
+    },
+    fileFilter: (_req, file, cb) => {
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Tipo di file non supportato. Solo PDF, JPG e PNG sono accettati.'));
+      }
+    }
+  });
+  
+  app.post("/api/import-ddt", (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) {
+        // Handle multer-specific errors
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ 
+            error: "File troppo grande", 
+            details: "La dimensione massima consentita è 10MB",
+            allowManualEntry: true 
+          });
+        }
+        if (err.message.includes('Tipo di file non supportato')) {
+          return res.status(415).json({ 
+            error: "Tipo di file non supportato", 
+            details: err.message,
+            allowManualEntry: true 
+          });
+        }
+        return res.status(400).json({ 
+          error: "Errore durante l'upload", 
+          details: err.message,
+          allowManualEntry: true 
+        });
+      }
+      next();
+    });
+  }, async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nessun file caricato" });
+      }
+
+      const fileBuffer = req.file.buffer;
+      const mimeType = req.file.mimetype;
+
+      // Server-side validation of MIME type (double-check)
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(mimeType)) {
+        return res.status(415).json({ 
+          error: "Tipo di file non valido", 
+          details: "Solo file PDF, JPG e PNG sono supportati",
+          allowManualEntry: true 
+        });
+      }
+
+      // Step 1: Extract text from file (OCR for images, text extraction for PDF)
+      let extractedText: string;
+      try {
+        extractedText = await extractTextFromDDT(fileBuffer, mimeType);
+        console.log("Testo estratto dal DDT:", extractedText.substring(0, 200));
+      } catch (ocrError: any) {
+        console.error("Errore OCR:", ocrError);
+        return res.status(500).json({ 
+          error: "Errore durante l'estrazione del testo", 
+          details: ocrError.message,
+          allowManualEntry: true 
+        });
+      }
+
+      // Step 2: Parse DDT data with AI
+      let ddtData;
+      try {
+        ddtData = await parseDDTWithAI(extractedText);
+        console.log("Dati estratti con AI:", ddtData);
+      } catch (aiError: any) {
+        console.error("Errore AI parsing:", aiError);
+        return res.status(500).json({ 
+          error: "Errore durante l'analisi dei dati", 
+          details: aiError.message,
+          extractedText,
+          allowManualEntry: true 
+        });
+      }
+
+      // Return parsed data
+      res.json({
+        success: true,
+        data: ddtData,
+        extractedText
+      });
+    } catch (error: any) {
+      console.error("Errore generale import DDT:", error);
+      res.status(500).json({ 
+        error: "Errore durante l'importazione del DDT",
+        details: error.message,
+        allowManualEntry: true 
+      });
     }
   });
 

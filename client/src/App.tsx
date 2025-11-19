@@ -9,7 +9,8 @@ import { useEffect } from "react";
 
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
-import Clienti from "@/pages/clienti";
+import Committenti from "@/pages/committenti";
+import Destinatari from "@/pages/destinatari";
 import Autisti from "@/pages/autisti";
 import Mezzi from "@/pages/mezzi";
 import Spedizioni from "@/pages/spedizioni";
@@ -51,8 +52,11 @@ function Router() {
       <Route path="/giri">
         <ProtectedRoute component={Giri} />
       </Route>
-      <Route path="/clienti">
-        <ProtectedRoute component={Clienti} />
+      <Route path="/committenti">
+        <ProtectedRoute component={Committenti} />
+      </Route>
+      <Route path="/destinatari">
+        <ProtectedRoute component={Destinatari} />
       </Route>
       <Route path="/autisti">
         <ProtectedRoute component={Autisti} />

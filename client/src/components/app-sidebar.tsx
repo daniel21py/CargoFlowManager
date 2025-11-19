@@ -1,4 +1,4 @@
-import { Home, Truck, Users, Package, Calendar, Building2, UserCircle, LogOut } from "lucide-react";
+import { Home, Truck, Users, Package, Calendar, Building2, MapPin, UserCircle, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -40,9 +40,14 @@ const menuItems = [
 
 const anagraficheItems = [
   {
-    title: "Clienti",
-    url: "/clienti",
+    title: "Committenti",
+    url: "/committenti",
     icon: Building2,
+  },
+  {
+    title: "Destinatari",
+    url: "/destinatari",
+    icon: MapPin,
   },
   {
     title: "Autisti",

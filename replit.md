@@ -15,8 +15,15 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 - Login semplice con username/password
 - Un solo utente "ufficio"
 
-### Clienti
+### Committenti
+- Chi affida le spedizioni all'azienda di trasporto
+- Nome, tipo (PRIVATO/AZIENDA)
+- Note opzionali
+
+### Destinatari
+- Destinazioni finali delle spedizioni
 - Ragione sociale, indirizzo completo (CAP, città, provincia)
+- Zona di appartenenza (per organizzazione giri)
 - Note opzionali
 
 ### Autisti
@@ -36,12 +43,14 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 
 ### Spedizioni
 - Numero progressivo auto-generato
-- Cliente e dati DDT (data, numero)
-- Destinatario completo
+- Riferimento a committente (chi affida la spedizione)
+- Riferimento a destinatario (da anagrafica destinatari)
+- Dati DDT (data, numero)
+- Campo opzionale per allegato file DDT (PDF/JPG)
 - Colli, peso in kg, contrassegno opzionale
 - Stati: INSERITA, ASSEGNATA, IN_CONSEGNA, CONSEGNATA, PROBLEMA
 - Collegamento al giro assegnato
-- Note ufficio
+- Note
 
 ## Funzionalità Principali
 
@@ -54,16 +63,19 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 - Statistiche giornaliere (spedizioni da assegnare, giri attivi, consegnate)
 - Azioni rapide per accesso veloce alle funzioni principali
 
-### Anagrafiche (Clienti, Autisti, Mezzi)
+### Anagrafiche (Committenti, Destinatari, Autisti, Mezzi)
 - Liste con ricerca
 - Form di creazione/modifica in dialog
 - Eliminazione con conferma
+- **Committenti**: gestione di chi affida le spedizioni
+- **Destinatari**: anagrafica centralizzata delle destinazioni
 
 ### Spedizioni
-- Tabella con filtri per stato e ricerca
-- Form di creazione da DDT con auto-compilazione destinatario dal cliente
+- Tabella con filtri per stato e ricerca (cerca per committente, destinatario, città)
+- Form di creazione con selezione committente e destinatario da anagrafica
 - Numero spedizione auto-generato
 - Badge colorati per gli stati
+- Campo per upload allegato DDT (preparato per implementazione futura)
 
 ### Giri
 - Gestione giri giornalieri per data
@@ -118,7 +130,8 @@ client/
     pages/
       login.tsx              # Pagina login
       dashboard.tsx          # Dashboard principale
-      clienti.tsx            # Gestione clienti
+      committenti.tsx        # Gestione committenti
+      destinatari.tsx        # Gestione destinatari
       autisti.tsx            # Gestione autisti
       mezzi.tsx              # Gestione mezzi
       spedizioni.tsx         # Gestione spedizioni
@@ -140,7 +153,8 @@ shared/
 ## API Endpoints
 - `POST /api/auth/login` - Login utente
 - `GET /api/stats` - Statistiche dashboard
-- CRUD `/api/clienti` - Gestione clienti
+- CRUD `/api/committenti` - Gestione committenti
+- CRUD `/api/destinatari` - Gestione destinatari
 - CRUD `/api/autisti` - Gestione autisti
 - CRUD `/api/mezzi` - Gestione mezzi
 - CRUD `/api/giri` - Gestione giri

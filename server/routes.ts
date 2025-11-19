@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { getStorage } from "./storage";
 import { insertClienteSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -8,6 +8,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
+      const storage = await getStorage();
       const user = await storage.getUserByUsername(username);
 
       if (!user || user.password !== password) {
@@ -23,6 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stats route
   app.get("/api/stats", async (_req, res) => {
     try {
+      const storage = await getStorage();
       const stats = await storage.getStats();
       res.json(stats);
     } catch (error) {
@@ -33,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Clienti routes
   app.get("/api/clienti", async (_req, res) => {
     try {
+      const storage = await getStorage();
       const clienti = await storage.getAllClienti();
       res.json(clienti);
     } catch (error) {
@@ -42,6 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clienti", async (req, res) => {
     try {
+      const storage = await getStorage();
       const data = insertClienteSchema.parse(req.body);
       const cliente = await storage.createCliente(data);
       res.json(cliente);
@@ -52,6 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/clienti/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       const data = insertClienteSchema.parse(req.body);
       const cliente = await storage.updateCliente(id, data);
@@ -63,6 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/clienti/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       await storage.deleteCliente(id);
       res.json({ success: true });
@@ -74,6 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Autisti routes
   app.get("/api/autisti", async (_req, res) => {
     try {
+      const storage = await getStorage();
       const autisti = await storage.getAllAutisti();
       res.json(autisti);
     } catch (error) {
@@ -83,6 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/autisti", async (req, res) => {
     try {
+      const storage = await getStorage();
       const data = insertAutistaSchema.parse(req.body);
       const autista = await storage.createAutista(data);
       res.json(autista);
@@ -93,6 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/autisti/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       const data = insertAutistaSchema.parse(req.body);
       const autista = await storage.updateAutista(id, data);
@@ -104,6 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/autisti/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       await storage.deleteAutista(id);
       res.json({ success: true });
@@ -115,6 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mezzi routes
   app.get("/api/mezzi", async (_req, res) => {
     try {
+      const storage = await getStorage();
       const mezzi = await storage.getAllMezzi();
       res.json(mezzi);
     } catch (error) {
@@ -124,6 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/mezzi", async (req, res) => {
     try {
+      const storage = await getStorage();
       const data = insertMezzoSchema.parse(req.body);
       const mezzo = await storage.createMezzo(data);
       res.json(mezzo);
@@ -134,6 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/mezzi/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       const data = insertMezzoSchema.parse(req.body);
       const mezzo = await storage.updateMezzo(id, data);
@@ -145,6 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/mezzi/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       await storage.deleteMezzo(id);
       res.json({ success: true });
@@ -156,6 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Giri routes
   app.get("/api/giri/:data", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { data } = req.params;
       const giri = await storage.getGiriByData(data);
       res.json(giri);
@@ -166,6 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/giri", async (req, res) => {
     try {
+      const storage = await getStorage();
       const data = insertGiroSchema.parse(req.body);
       const giro = await storage.createGiro(data);
       res.json(giro);
@@ -176,6 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/giri/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       await storage.deleteGiro(id);
       res.json({ success: true });
@@ -187,6 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Spedizioni routes
   app.get("/api/spedizioni", async (_req, res) => {
     try {
+      const storage = await getStorage();
       const spedizioni = await storage.getAllSpedizioni();
       res.json(spedizioni);
     } catch (error) {
@@ -196,6 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/spedizioni", async (req, res) => {
     try {
+      const storage = await getStorage();
       const data = insertSpedizioneSchema.parse(req.body);
       const spedizione = await storage.createSpedizione(data);
       res.json(spedizione);
@@ -206,6 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/spedizioni/:id/assign", async (req, res) => {
     try {
+      const storage = await getStorage();
       const { id } = req.params;
       const { giroId } = req.body;
       const spedizione = await storage.assignSpedizione(id, giroId);

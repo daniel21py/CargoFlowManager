@@ -314,4 +314,23 @@ export class MemStorage implements IStorage {
   }
 }
 
+// Use DbStorage when DATABASE_URL is available, otherwise MemStorage
+async function createStorage(): Promise<IStorage> {
+  if (process.env.DATABASE_URL) {
+    const { DbStorage } = await import("./db-storage");
+    return new DbStorage();
+  }
+  return new MemStorage();
+}
+
+let storageInstance: IStorage | null = null;
+
+export async function getStorage(): Promise<IStorage> {
+  if (!storageInstance) {
+    storageInstance = await createStorage();
+  }
+  return storageInstance;
+}
+
+// For backwards compatibility with existing code
 export const storage = new MemStorage();

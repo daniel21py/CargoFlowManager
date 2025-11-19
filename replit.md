@@ -6,7 +6,7 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 ## Tecnologie
 - **Frontend**: React, TypeScript, Tailwind CSS, Shadcn UI, Wouter (routing)
 - **Backend**: Express.js, Node.js
-- **Database**: In-memory storage (MemStorage)
+- **Database**: PostgreSQL (Neon) con Drizzle ORM
 - **Drag & Drop**: @dnd-kit
 
 ## Struttura Database
@@ -92,11 +92,12 @@ Le credenziali sono configurate nel file `server/storage.ts`:
 3. Login con le credenziali di default
 
 ## Note Tecniche
-- Tutti i dati sono memorizzati in memoria (persi al riavvio)
+- **Database persistente PostgreSQL** - I dati sono salvati permanentemente
 - L'autenticazione è molto semplice (solo per uso ufficio interno)
 - Due turni giornalieri: MATTINO e POMERIGGIO
 - Numero spedizione generato automaticamente in modo incrementale
 - Design responsive ottimizzato per desktop
+- Prima esecuzione richiede seed del database: `npx tsx server/seed.ts`
 
 ## Struttura File
 ```
@@ -118,9 +119,12 @@ client/
     index.css               # Stili globali
 server/
   routes.ts                 # API endpoints
-  storage.ts                # Storage in memoria
+  storage.ts                # Interfaccia storage
+  db-storage.ts             # Implementazione PostgreSQL
+  db.ts                     # Connessione database
+  seed.ts                   # Script di seed database
 shared/
-  schema.ts                 # Schemi dati e tipi TypeScript
+  schema.ts                 # Schemi Drizzle ORM e tipi TypeScript
 ```
 
 ## API Endpoints

@@ -247,7 +247,7 @@ export default function Mezzi() {
               <Label htmlFor="note">Note</Label>
               <Textarea
                 id="note"
-                value={formData.note}
+                value={formData.note || ""}
                 onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                 rows={3}
                 data-testid="input-note"

@@ -388,7 +388,7 @@ export default function Spedizioni() {
                 <Label htmlFor="noteUfficio">Note Ufficio</Label>
                 <Textarea
                   id="noteUfficio"
-                  value={formData.noteUfficio}
+                  value={formData.noteUfficio || ""}
                   onChange={(e) => setFormData({ ...formData, noteUfficio: e.target.value })}
                   rows={3}
                   data-testid="input-note-ufficio"

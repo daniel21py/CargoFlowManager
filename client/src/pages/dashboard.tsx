@@ -3,8 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Truck, Clock, CheckCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+interface Stats {
+  spedizioniDaAssegnare: number;
+  giriOggi: number;
+  inConsegna: number;
+  consegnateOggi: number;
+}
+
 export default function Dashboard() {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading } = useQuery<Stats>({
     queryKey: ["/api/stats"],
   });
 

@@ -120,13 +120,13 @@ export class MemStorage implements IStorage {
 
   async createCliente(insertCliente: InsertCliente): Promise<Cliente> {
     const id = randomUUID();
-    const cliente: Cliente = { ...insertCliente, id };
+    const cliente: Cliente = { ...insertCliente, id, note: insertCliente.note ?? null };
     this.clienti.set(id, cliente);
     return cliente;
   }
 
   async updateCliente(id: string, insertCliente: InsertCliente): Promise<Cliente> {
-    const cliente: Cliente = { ...insertCliente, id };
+    const cliente: Cliente = { ...insertCliente, id, note: insertCliente.note ?? null };
     this.clienti.set(id, cliente);
     return cliente;
   }
@@ -146,13 +146,13 @@ export class MemStorage implements IStorage {
 
   async createAutista(insertAutista: InsertAutista): Promise<Autista> {
     const id = randomUUID();
-    const autista: Autista = { ...insertAutista, id };
+    const autista: Autista = { ...insertAutista, id, attivo: insertAutista.attivo ?? true };
     this.autisti.set(id, autista);
     return autista;
   }
 
   async updateAutista(id: string, insertAutista: InsertAutista): Promise<Autista> {
-    const autista: Autista = { ...insertAutista, id };
+    const autista: Autista = { ...insertAutista, id, attivo: insertAutista.attivo ?? true };
     this.autisti.set(id, autista);
     return autista;
   }
@@ -172,13 +172,13 @@ export class MemStorage implements IStorage {
 
   async createMezzo(insertMezzo: InsertMezzo): Promise<Mezzo> {
     const id = randomUUID();
-    const mezzo: Mezzo = { ...insertMezzo, id };
+    const mezzo: Mezzo = { ...insertMezzo, id, note: insertMezzo.note ?? null };
     this.mezzi.set(id, mezzo);
     return mezzo;
   }
 
   async updateMezzo(id: string, insertMezzo: InsertMezzo): Promise<Mezzo> {
-    const mezzo: Mezzo = { ...insertMezzo, id };
+    const mezzo: Mezzo = { ...insertMezzo, id, note: insertMezzo.note ?? null };
     this.mezzi.set(id, mezzo);
     return mezzo;
   }
@@ -217,7 +217,7 @@ export class MemStorage implements IStorage {
 
   async createGiro(insertGiro: InsertGiro): Promise<Giro> {
     const id = randomUUID();
-    const giro: Giro = { ...insertGiro, id };
+    const giro: Giro = { ...insertGiro, id, zona: insertGiro.zona ?? null, note: insertGiro.note ?? null };
     this.giri.set(id, giro);
     return giro;
   }
@@ -266,6 +266,10 @@ export class MemStorage implements IStorage {
       ...insertSpedizione,
       id,
       numeroSpedizione,
+      contrassegno: insertSpedizione.contrassegno ?? null,
+      giroId: insertSpedizione.giroId ?? null,
+      noteUfficio: insertSpedizione.noteUfficio ?? null,
+      stato: insertSpedizione.stato ?? "INSERITA",
     };
     this.spedizioni.set(id, spedizione);
     return spedizione;

@@ -266,7 +266,7 @@ export default function Giri() {
               <Label htmlFor="zona">Zona</Label>
               <Input
                 id="zona"
-                value={formData.zona}
+                value={formData.zona || ""}
                 onChange={(e) => setFormData({ ...formData, zona: e.target.value })}
                 placeholder="es. Bergamo Centro"
                 data-testid="input-zona"
@@ -277,7 +277,7 @@ export default function Giri() {
               <Label htmlFor="note">Note</Label>
               <Textarea
                 id="note"
-                value={formData.note}
+                value={formData.note || ""}
                 onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                 rows={2}
                 data-testid="input-note"

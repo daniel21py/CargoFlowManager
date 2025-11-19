@@ -183,13 +183,13 @@ export default function StampaDDT() {
                 {giro.spedizioni?.map((spedizione) => (
                   <tr key={spedizione.id} className="border-b">
                     <td className="py-3 px-2">{spedizione.numeroSpedizione}</td>
-                    <td className="py-3 px-2">{spedizione.destinatarioNome}</td>
+                    <td className="py-3 px-2">{spedizione.destinatario.ragioneSociale}</td>
                     <td className="py-3 px-2 text-sm">
-                      {spedizione.destinatarioIndirizzo}
+                      {spedizione.destinatario.indirizzo}
                       <br />
                       <span className="text-muted-foreground">
-                        {spedizione.destinatarioCap} {spedizione.destinatarioCitta} (
-                        {spedizione.destinatarioProvincia})
+                        {spedizione.destinatario.cap} {spedizione.destinatario.citta} (
+                        {spedizione.destinatario.provincia})
                       </span>
                     </td>
                     <td className="py-3 px-2 text-right">{spedizione.colli}</td>

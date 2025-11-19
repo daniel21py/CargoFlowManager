@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { SpedizioneWithCliente, InsertSpedizione, Cliente } from "@shared/schema";
+import type { SpedizioneWithDetails, InsertSpedizione, Committente, Destinatario } from "@shared/schema";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -31,28 +31,29 @@ export default function Spedizioni() {
   const [filterStato, setFilterStato] = useState<string>("ALL");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<InsertSpedizione>({
-    clienteId: "",
+    committenteId: "",
+    destinatarioId: "",
     dataDDT: new Date().toISOString().split("T")[0],
     numeroDDT: "",
-    destinatarioNome: "",
-    destinatarioIndirizzo: "",
-    destinatarioCap: "",
-    destinatarioCitta: "",
-    destinatarioProvincia: "",
     colli: 1,
     pesoKg: "0",
     contrassegno: null,
+    filePath: null,
     stato: "INSERITA",
     giroId: null,
-    noteUfficio: "",
+    note: "",
   });
 
-  const { data: spedizioni, isLoading } = useQuery<SpedizioneWithCliente[]>({
+  const { data: spedizioni, isLoading } = useQuery<SpedizioneWithDetails[]>({
     queryKey: ["/api/spedizioni"],
   });
 
-  const { data: clienti } = useQuery<Cliente[]>({
-    queryKey: ["/api/clienti"],
+  const { data: committenti } = useQuery<Committente[]>({
+    queryKey: ["/api/committenti"],
+  });
+
+  const { data: destinatari } = useQuery<Destinatario[]>({
+    queryKey: ["/api/destinatari"],
   });
 
   const createMutation = useMutation({
@@ -67,20 +68,17 @@ export default function Spedizioni() {
 
   const resetForm = () => {
     setFormData({
-      clienteId: "",
+      committenteId: "",
+      destinatarioId: "",
       dataDDT: new Date().toISOString().split("T")[0],
       numeroDDT: "",
-      destinatarioNome: "",
-      destinatarioIndirizzo: "",
-      destinatarioCap: "",
-      destinatarioCitta: "",
-      destinatarioProvincia: "",
       colli: 1,
       pesoKg: "0",
       contrassegno: null,
+      filePath: null,
       stato: "INSERITA",
       giroId: null,
-      noteUfficio: "",
+      note: "",
     });
     setIsDialogOpen(false);
   };
@@ -90,26 +88,12 @@ export default function Spedizioni() {
     createMutation.mutate(formData);
   };
 
-  const handleClienteChange = (clienteId: string) => {
-    const cliente = clienti?.find((c) => c.id === clienteId);
-    if (cliente) {
-      setFormData({
-        ...formData,
-        clienteId,
-        destinatarioNome: cliente.ragioneSociale,
-        destinatarioIndirizzo: cliente.indirizzo,
-        destinatarioCap: cliente.cap,
-        destinatarioCitta: cliente.citta,
-        destinatarioProvincia: cliente.provincia,
-      });
-    }
-  };
 
   const filteredSpedizioni = spedizioni?.filter((s) => {
     const matchesSearch =
       s.numeroSpedizione.toString().includes(searchTerm) ||
-      s.cliente.ragioneSociale.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.destinatarioCitta.toLowerCase().includes(searchTerm.toLowerCase());
+      s.committente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.destinatario.citta.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStato = filterStato === "ALL" || s.stato === filterStato;
     return matchesSearch && matchesStato;
   });
@@ -131,7 +115,7 @@ export default function Spedizioni() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Cerca per numero, cliente o città..."
+            placeholder="Cerca per numero, committente o città..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -171,7 +155,7 @@ export default function Spedizioni() {
                   <TableRow>
                     <TableHead>Numero</TableHead>
                     <TableHead>Data DDT</TableHead>
-                    <TableHead>Cliente</TableHead>
+                    <TableHead>Committente</TableHead>
                     <TableHead>Destinazione</TableHead>
                     <TableHead className="text-right">Colli</TableHead>
                     <TableHead className="text-right">Peso (kg)</TableHead>
@@ -193,15 +177,15 @@ export default function Spedizioni() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{spedizione.cliente.ragioneSociale}</p>
+                          <p className="font-medium">{spedizione.committente.nome}</p>
                           <p className="text-xs text-muted-foreground">DDT {spedizione.numeroDDT}</p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{spedizione.destinatarioNome}</p>
+                          <p className="font-medium">{spedizione.destinatario.ragioneSociale}</p>
                           <p className="text-xs text-muted-foreground">
-                            {spedizione.destinatarioCitta} ({spedizione.destinatarioProvincia})
+                            {spedizione.destinatario.citta} ({spedizione.destinatario.provincia})
                           </p>
                         </div>
                       </TableCell>
@@ -241,18 +225,18 @@ export default function Spedizioni() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4 p-4 rounded-md border">
-              <h3 className="font-semibold">Dati Cliente e DDT</h3>
+              <h3 className="font-semibold">Dati Committente e DDT</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="clienteId">Cliente *</Label>
-                  <Select value={formData.clienteId} onValueChange={handleClienteChange} required>
-                    <SelectTrigger data-testid="select-cliente">
-                      <SelectValue placeholder="Seleziona cliente" />
+                  <Label htmlFor="committenteId">Committente *</Label>
+                  <Select value={formData.committenteId} onValueChange={(value) => setFormData({ ...formData, committenteId: value })} required>
+                    <SelectTrigger data-testid="select-committente">
+                      <SelectValue placeholder="Seleziona committente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {clienti?.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.ragioneSociale}
+                      {committenti?.map((committente) => (
+                        <SelectItem key={committente.id} value={committente.id}>
+                          {committente.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -285,60 +269,19 @@ export default function Spedizioni() {
             <div className="space-y-4 p-4 rounded-md border">
               <h3 className="font-semibold">Destinatario</h3>
               <div className="space-y-2">
-                <Label htmlFor="destinatarioNome">Nome/Ragione Sociale *</Label>
-                <Input
-                  id="destinatarioNome"
-                  value={formData.destinatarioNome}
-                  onChange={(e) => setFormData({ ...formData, destinatarioNome: e.target.value })}
-                  required
-                  data-testid="input-destinatario-nome"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="destinatarioIndirizzo">Indirizzo *</Label>
-                  <Input
-                    id="destinatarioIndirizzo"
-                    value={formData.destinatarioIndirizzo}
-                    onChange={(e) => setFormData({ ...formData, destinatarioIndirizzo: e.target.value })}
-                    required
-                    data-testid="input-destinatario-indirizzo"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="destinatarioCap">CAP *</Label>
-                  <Input
-                    id="destinatarioCap"
-                    value={formData.destinatarioCap}
-                    onChange={(e) => setFormData({ ...formData, destinatarioCap: e.target.value })}
-                    required
-                    data-testid="input-destinatario-cap"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="destinatarioCitta">Città *</Label>
-                  <Input
-                    id="destinatarioCitta"
-                    value={formData.destinatarioCitta}
-                    onChange={(e) => setFormData({ ...formData, destinatarioCitta: e.target.value })}
-                    required
-                    data-testid="input-destinatario-citta"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="destinatarioProvincia">Provincia *</Label>
-                  <Input
-                    id="destinatarioProvincia"
-                    value={formData.destinatarioProvincia}
-                    onChange={(e) => setFormData({ ...formData, destinatarioProvincia: e.target.value })}
-                    required
-                    maxLength={2}
-                    placeholder="BG"
-                    data-testid="input-destinatario-provincia"
-                  />
-                </div>
+                <Label htmlFor="destinatarioId">Destinatario *</Label>
+                <Select value={formData.destinatarioId} onValueChange={(value) => setFormData({ ...formData, destinatarioId: value })} required>
+                  <SelectTrigger data-testid="select-destinatario">
+                    <SelectValue placeholder="Seleziona destinatario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {destinatari?.map((destinatario) => (
+                      <SelectItem key={destinatario.id} value={destinatario.id}>
+                        {destinatario.ragioneSociale} - {destinatario.citta}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -385,13 +328,13 @@ export default function Spedizioni() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="noteUfficio">Note Ufficio</Label>
+                <Label htmlFor="note">Note</Label>
                 <Textarea
-                  id="noteUfficio"
-                  value={formData.noteUfficio || ""}
-                  onChange={(e) => setFormData({ ...formData, noteUfficio: e.target.value })}
+                  id="note"
+                  value={formData.note || ""}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                   rows={3}
-                  data-testid="input-note-ufficio"
+                  data-testid="input-note"
                 />
               </div>
             </div>

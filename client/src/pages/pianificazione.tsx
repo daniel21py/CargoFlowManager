@@ -9,7 +9,7 @@ import { Calendar as CalendarIcon, Package, MapPin, Weight, Hash, Truck } from "
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import type { SpedizioneWithCliente, GiroWithDetails } from "@shared/schema";
+import type { SpedizioneWithDetails, GiroWithDetails } from "@shared/schema";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 
 const STATI_COLORS = {
@@ -20,7 +20,7 @@ const STATI_COLORS = {
   PROBLEMA: "bg-red-100 text-red-800 border-red-200",
 };
 
-function SpedizioneCard({ spedizione, isDragging = false }: { spedizione: SpedizioneWithCliente; isDragging?: boolean }) {
+function SpedizioneCard({ spedizione, isDragging = false }: { spedizione: SpedizioneWithDetails; isDragging?: boolean }) {
   return (
     <Card className={`hover-elevate cursor-move ${isDragging ? "opacity-50" : ""}`}>
       <CardContent className="p-3 space-y-2">
@@ -34,10 +34,10 @@ function SpedizioneCard({ spedizione, isDragging = false }: { spedizione: Spediz
           </Badge>
         </div>
         <div className="space-y-1">
-          <p className="font-medium text-sm truncate">{spedizione.cliente.ragioneSociale}</p>
+          <p className="font-medium text-sm truncate">{spedizione.committente.nome}</p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{spedizione.destinatarioCitta} ({spedizione.destinatarioProvincia})</span>
+            <span className="truncate">{spedizione.destinatario.citta} ({spedizione.destinatario.provincia})</span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1">
@@ -63,7 +63,7 @@ function DroppableColumn({
 }: { 
   id: string; 
   title: string; 
-  spedizioni: SpedizioneWithCliente[]; 
+  spedizioni: SpedizioneWithDetails[]; 
   giro?: GiroWithDetails;
 }) {
   return (
@@ -123,7 +123,7 @@ export default function Pianificazione() {
   const [selectedData, setSelectedData] = useState(new Date().toISOString().split("T")[0]);
   const [selectedTurno, setSelectedTurno] = useState<"MATTINO" | "POMERIGGIO">("MATTINO");
 
-  const { data: spedizioni, isLoading: isLoadingSpedizioni } = useQuery<SpedizioneWithCliente[]>({
+  const { data: spedizioni, isLoading: isLoadingSpedizioni } = useQuery<SpedizioneWithDetails[]>({
     queryKey: ["/api/spedizioni"],
   });
 

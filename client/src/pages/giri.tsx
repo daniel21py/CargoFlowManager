@@ -177,7 +177,7 @@ export default function Giri() {
                               data-testid={`button-print-${giro.id}`}
                             >
                               <Printer className="mr-1 h-3 w-3" />
-                              Stampa DDT
+                              Distinta Giornaliera
                             </Button>
                           </Link>
                           <Button

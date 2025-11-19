@@ -48,7 +48,7 @@ export default function StampaDDT() {
       {/* Print Button - hidden when printing */}
       <div className="print:hidden p-4 border-b">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Documento di Trasporto</h1>
+          <h1 className="text-xl font-semibold">Distinta Giornaliera</h1>
           <Button onClick={handlePrint} data-testid="button-print">
             <Printer className="mr-2 h-4 w-4" />
             Stampa
@@ -60,7 +60,7 @@ export default function StampaDDT() {
       <div className="max-w-4xl mx-auto p-8 print:p-12">
         {/* Header */}
         <div className="mb-8 border-b-2 border-foreground pb-4">
-          <h1 className="text-3xl font-bold mb-2">DOCUMENTO DI TRASPORTO</h1>
+          <h1 className="text-3xl font-bold mb-2">DISTINTA GIORNALIERA</h1>
           <div className="flex justify-between text-sm">
             <div>
               <p className="font-semibold">TMS Bergamo</p>

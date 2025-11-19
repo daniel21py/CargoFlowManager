@@ -2,8 +2,10 @@ import { randomUUID } from "crypto";
 import type {
   User,
   InsertUser,
-  Cliente,
-  InsertCliente,
+  Committente,
+  InsertCommittente,
+  Destinatario,
+  InsertDestinatario,
   Autista,
   InsertAutista,
   Mezzo,
@@ -12,7 +14,7 @@ import type {
   InsertGiro,
   Spedizione,
   InsertSpedizione,
-  SpedizioneWithCliente,
+  SpedizioneWithDetails,
   GiroWithDetails,
 } from "@shared/schema";
 
@@ -22,12 +24,19 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
-  // Clienti
-  getAllClienti(): Promise<Cliente[]>;
-  getCliente(id: string): Promise<Cliente | undefined>;
-  createCliente(cliente: InsertCliente): Promise<Cliente>;
-  updateCliente(id: string, cliente: InsertCliente): Promise<Cliente>;
-  deleteCliente(id: string): Promise<void>;
+  // Committenti
+  getAllCommittenti(): Promise<Committente[]>;
+  getCommittente(id: string): Promise<Committente | undefined>;
+  createCommittente(committente: InsertCommittente): Promise<Committente>;
+  updateCommittente(id: string, committente: InsertCommittente): Promise<Committente>;
+  deleteCommittente(id: string): Promise<void>;
+
+  // Destinatari
+  getAllDestinatari(): Promise<Destinatario[]>;
+  getDestinatario(id: string): Promise<Destinatario | undefined>;
+  createDestinatario(destinatario: InsertDestinatario): Promise<Destinatario>;
+  updateDestinatario(id: string, destinatario: InsertDestinatario): Promise<Destinatario>;
+  deleteDestinatario(id: string): Promise<void>;
 
   // Autisti
   getAllAutisti(): Promise<Autista[]>;
@@ -51,7 +60,7 @@ export interface IStorage {
   deleteGiro(id: string): Promise<void>;
 
   // Spedizioni
-  getAllSpedizioni(): Promise<SpedizioneWithCliente[]>;
+  getAllSpedizioni(): Promise<SpedizioneWithDetails[]>;
   getSpedizione(id: string): Promise<Spedizione | undefined>;
   createSpedizione(spedizione: InsertSpedizione): Promise<Spedizione>;
   assignSpedizione(id: string, giroId: string | null): Promise<Spedizione>;

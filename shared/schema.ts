@@ -18,23 +18,39 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-// Clienti (Customers)
-export const clienti = pgTable("clienti", {
+// Committenti (Shippers/Customers who assign shipments)
+export const committenti = pgTable("committenti", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: text("nome").notNull(),
+  tipo: text("tipo"), // es: "Azienda Trasporto", "Cliente Diretto", etc.
+  note: text("note"),
+});
+
+export const insertCommittenteSchema = createInsertSchema(committenti).omit({
+  id: true,
+});
+
+export type InsertCommittente = z.infer<typeof insertCommittenteSchema>;
+export type Committente = typeof committenti.$inferSelect;
+
+// Destinatari (Final delivery destinations)
+export const destinatari = pgTable("destinatari", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ragioneSociale: text("ragione_sociale").notNull(),
   indirizzo: text("indirizzo").notNull(),
   cap: text("cap").notNull(),
   citta: text("citta").notNull(),
   provincia: text("provincia").notNull(),
+  zona: text("zona"), // Area geografica (es: "Bergamo Centro", "Bergamo Sud")
   note: text("note"),
 });
 
-export const insertClienteSchema = createInsertSchema(clienti).omit({
+export const insertDestinatarioSchema = createInsertSchema(destinatari).omit({
   id: true,
 });
 
-export type InsertCliente = z.infer<typeof insertClienteSchema>;
-export type Cliente = typeof clienti.$inferSelect;
+export type InsertDestinatario = z.infer<typeof insertDestinatarioSchema>;
+export type Destinatario = typeof destinatari.$inferSelect;
 
 // Autisti (Drivers)
 export const autisti = pgTable("autisti", {
@@ -91,20 +107,17 @@ export type Giro = typeof giri.$inferSelect;
 export const spedizioni = pgTable("spedizioni", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   numeroSpedizione: integer("numero_spedizione").notNull().unique(),
-  clienteId: varchar("cliente_id").notNull().references(() => clienti.id),
+  committenteId: varchar("committente_id").notNull().references(() => committenti.id),
+  destinatarioId: varchar("destinatario_id").notNull().references(() => destinatari.id),
   dataDDT: date("data_ddt").notNull(),
   numeroDDT: text("numero_ddt").notNull(),
-  destinatarioNome: text("destinatario_nome").notNull(),
-  destinatarioIndirizzo: text("destinatario_indirizzo").notNull(),
-  destinatarioCap: text("destinatario_cap").notNull(),
-  destinatarioCitta: text("destinatario_citta").notNull(),
-  destinatarioProvincia: text("destinatario_provincia").notNull(),
   colli: integer("colli").notNull(),
   pesoKg: decimal("peso_kg", { precision: 10, scale: 2 }).notNull(),
   contrassegno: decimal("contrassegno", { precision: 10, scale: 2 }),
+  filePath: text("file_path"), // Path to uploaded DDT file (PDF/JPG)
+  note: text("note"), // Note sulla spedizione
   stato: text("stato").notNull().default("INSERITA"), // INSERITA, ASSEGNATA, IN_CONSEGNA, CONSEGNATA, PROBLEMA
   giroId: varchar("giro_id").references(() => giri.id),
-  noteUfficio: text("note_ufficio"),
 });
 
 export const insertSpedizioneSchema = createInsertSchema(spedizioni).omit({
@@ -121,12 +134,13 @@ export type Spedizione = typeof spedizioni.$inferSelect;
 export type UpdateSpedizioneStato = z.infer<typeof updateSpedizioneStatoSchema>;
 
 // Extended types with relations for frontend
-export type SpedizioneWithCliente = Spedizione & {
-  cliente: Cliente;
+export type SpedizioneWithDetails = Spedizione & {
+  committente: Committente;
+  destinatario: Destinatario;
 };
 
 export type GiroWithDetails = Giro & {
   autista: Autista;
   mezzo: Mezzo;
-  spedizioni?: Spedizione[];
+  spedizioni?: SpedizioneWithDetails[];
 };

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, clienti, autisti, mezzi } from "@shared/schema";
+import { users, committenti, destinatari, autisti, mezzi } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 async function seed() {
@@ -22,39 +22,68 @@ async function seed() {
     console.log("ℹ️  Default user already exists");
   }
 
-  // Seed sample customers
-  const existingClienti = await db.select().from(clienti).limit(1);
-  if (existingClienti.length === 0) {
-    console.log("📦 Seeding sample customers...");
-    await db.insert(clienti).values([
+  // Seed sample committenti (principals)
+  const existingCommittenti = await db.select().from(committenti).limit(1);
+  if (existingCommittenti.length === 0) {
+    console.log("📦 Seeding sample committenti...");
+    await db.insert(committenti).values([
       {
-        ragioneSociale: "Acme Srl",
+        nome: "Acme Srl",
+        tipo: "Azienda",
+        note: null,
+      },
+      {
+        nome: "Beta Spa",
+        tipo: "Azienda",
+        note: null,
+      },
+      {
+        nome: "Gamma Logistics",
+        tipo: "Spedizioniere",
+        note: "Cliente preferenziale",
+      },
+    ]);
+    console.log("✅ Sample committenti created");
+  } else {
+    console.log("ℹ️  Sample committenti already exist");
+  }
+
+  // Seed sample destinatari (recipients)
+  const existingDestinatari = await db.select().from(destinatari).limit(1);
+  if (existingDestinatari.length === 0) {
+    console.log("📍 Seeding sample destinatari...");
+    await db.insert(destinatari).values([
+      {
+        ragioneSociale: "Delta Store",
         indirizzo: "Via Roma 123",
         cap: "24100",
         citta: "Bergamo",
         provincia: "BG",
+        zona: "Bergamo Centro",
         note: null,
       },
       {
-        ragioneSociale: "Beta Spa",
+        ragioneSociale: "Epsilon Market",
         indirizzo: "Corso Italia 45",
         cap: "24047",
         citta: "Treviglio",
         provincia: "BG",
+        zona: "Treviglio",
         note: null,
       },
       {
-        ragioneSociale: "Gamma Logistics",
+        ragioneSociale: "Zeta Warehouse",
         indirizzo: "Via Milano 67",
         cap: "24050",
         citta: "Zanica",
         provincia: "BG",
-        note: "Cliente preferenziale",
+        zona: "Bergamo Est",
+        note: "Accesso difficile, zona industriale",
       },
     ]);
-    console.log("✅ Sample customers created");
+    console.log("✅ Sample destinatari created");
   } else {
-    console.log("ℹ️  Sample customers already exist");
+    console.log("ℹ️  Sample destinatari already exist");
   }
 
   // Seed sample drivers

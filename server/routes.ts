@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getStorage } from "./storage";
-import { insertClienteSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema, updateSpedizioneStatoSchema } from "@shared/schema";
+import { insertCommittenteSchema, insertDestinatarioSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema, updateSpedizioneStatoSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -32,45 +32,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Clienti routes
-  app.get("/api/clienti", async (_req, res) => {
+  // Committenti routes
+  app.get("/api/committenti", async (_req, res) => {
     try {
       const storage = await getStorage();
-      const clienti = await storage.getAllClienti();
-      res.json(clienti);
+      const committenti = await storage.getAllCommittenti();
+      res.json(committenti);
     } catch (error) {
-      res.status(500).json({ error: "Errore nel recupero clienti" });
+      res.status(500).json({ error: "Errore nel recupero committenti" });
     }
   });
 
-  app.post("/api/clienti", async (req, res) => {
+  app.post("/api/committenti", async (req, res) => {
     try {
       const storage = await getStorage();
-      const data = insertClienteSchema.parse(req.body);
-      const cliente = await storage.createCliente(data);
-      res.json(cliente);
-    } catch (error) {
-      res.status(400).json({ error: "Dati non validi" });
-    }
-  });
-
-  app.put("/api/clienti/:id", async (req, res) => {
-    try {
-      const storage = await getStorage();
-      const { id } = req.params;
-      const data = insertClienteSchema.parse(req.body);
-      const cliente = await storage.updateCliente(id, data);
-      res.json(cliente);
+      const data = insertCommittenteSchema.parse(req.body);
+      const committente = await storage.createCommittente(data);
+      res.json(committente);
     } catch (error) {
       res.status(400).json({ error: "Dati non validi" });
     }
   });
 
-  app.delete("/api/clienti/:id", async (req, res) => {
+  app.put("/api/committenti/:id", async (req, res) => {
     try {
       const storage = await getStorage();
       const { id } = req.params;
-      await storage.deleteCliente(id);
+      const data = insertCommittenteSchema.parse(req.body);
+      const committente = await storage.updateCommittente(id, data);
+      res.json(committente);
+    } catch (error) {
+      res.status(400).json({ error: "Dati non validi" });
+    }
+  });
+
+  app.delete("/api/committenti/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const { id } = req.params;
+      await storage.deleteCommittente(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Errore nell'eliminazione" });
+    }
+  });
+
+  // Destinatari routes
+  app.get("/api/destinatari", async (_req, res) => {
+    try {
+      const storage = await getStorage();
+      const destinatari = await storage.getAllDestinatari();
+      res.json(destinatari);
+    } catch (error) {
+      res.status(500).json({ error: "Errore nel recupero destinatari" });
+    }
+  });
+
+  app.post("/api/destinatari", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const data = insertDestinatarioSchema.parse(req.body);
+      const destinatario = await storage.createDestinatario(data);
+      res.json(destinatario);
+    } catch (error) {
+      res.status(400).json({ error: "Dati non validi" });
+    }
+  });
+
+  app.put("/api/destinatari/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const { id } = req.params;
+      const data = insertDestinatarioSchema.parse(req.body);
+      const destinatario = await storage.updateDestinatario(id, data);
+      res.json(destinatario);
+    } catch (error) {
+      res.status(400).json({ error: "Dati non validi" });
+    }
+  });
+
+  app.delete("/api/destinatari/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const { id } = req.params;
+      await storage.deleteDestinatario(id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Errore nell'eliminazione" });

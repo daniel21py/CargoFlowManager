@@ -78,7 +78,8 @@ export interface IStorage {
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
-  private clienti: Map<string, Cliente>;
+  private committenti: Map<string, Committente>;
+  private destinatari: Map<string, Destinatario>;
   private autisti: Map<string, Autista>;
   private mezzi: Map<string, Mezzo>;
   private giri: Map<string, Giro>;
@@ -87,7 +88,8 @@ export class MemStorage implements IStorage {
 
   constructor() {
     this.users = new Map();
-    this.clienti = new Map();
+    this.committenti = new Map();
+    this.destinatari = new Map();
     this.autisti = new Map();
     this.mezzi = new Map();
     this.giri = new Map();
@@ -119,30 +121,76 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  // Clienti methods
-  async getAllClienti(): Promise<Cliente[]> {
-    return Array.from(this.clienti.values());
+  // Committenti methods
+  async getAllCommittenti(): Promise<Committente[]> {
+    return Array.from(this.committenti.values());
   }
 
-  async getCliente(id: string): Promise<Cliente | undefined> {
-    return this.clienti.get(id);
+  async getCommittente(id: string): Promise<Committente | undefined> {
+    return this.committenti.get(id);
   }
 
-  async createCliente(insertCliente: InsertCliente): Promise<Cliente> {
+  async createCommittente(insertCommittente: InsertCommittente): Promise<Committente> {
     const id = randomUUID();
-    const cliente: Cliente = { ...insertCliente, id, note: insertCliente.note ?? null };
-    this.clienti.set(id, cliente);
-    return cliente;
+    const committente: Committente = { 
+      ...insertCommittente, 
+      id, 
+      tipo: insertCommittente.tipo ?? null,
+      note: insertCommittente.note ?? null 
+    };
+    this.committenti.set(id, committente);
+    return committente;
   }
 
-  async updateCliente(id: string, insertCliente: InsertCliente): Promise<Cliente> {
-    const cliente: Cliente = { ...insertCliente, id, note: insertCliente.note ?? null };
-    this.clienti.set(id, cliente);
-    return cliente;
+  async updateCommittente(id: string, insertCommittente: InsertCommittente): Promise<Committente> {
+    const committente: Committente = { 
+      ...insertCommittente, 
+      id, 
+      tipo: insertCommittente.tipo ?? null,
+      note: insertCommittente.note ?? null 
+    };
+    this.committenti.set(id, committente);
+    return committente;
   }
 
-  async deleteCliente(id: string): Promise<void> {
-    this.clienti.delete(id);
+  async deleteCommittente(id: string): Promise<void> {
+    this.committenti.delete(id);
+  }
+
+  // Destinatari methods
+  async getAllDestinatari(): Promise<Destinatario[]> {
+    return Array.from(this.destinatari.values());
+  }
+
+  async getDestinatario(id: string): Promise<Destinatario | undefined> {
+    return this.destinatari.get(id);
+  }
+
+  async createDestinatario(insertDestinatario: InsertDestinatario): Promise<Destinatario> {
+    const id = randomUUID();
+    const destinatario: Destinatario = { 
+      ...insertDestinatario, 
+      id,
+      zona: insertDestinatario.zona ?? null,
+      note: insertDestinatario.note ?? null 
+    };
+    this.destinatari.set(id, destinatario);
+    return destinatario;
+  }
+
+  async updateDestinatario(id: string, insertDestinatario: InsertDestinatario): Promise<Destinatario> {
+    const destinatario: Destinatario = { 
+      ...insertDestinatario, 
+      id,
+      zona: insertDestinatario.zona ?? null,
+      note: insertDestinatario.note ?? null 
+    };
+    this.destinatari.set(id, destinatario);
+    return destinatario;
+  }
+
+  async deleteDestinatario(id: string): Promise<void> {
+    this.destinatari.delete(id);
   }
 
   // Autisti methods
@@ -232,7 +280,22 @@ export class MemStorage implements IStorage {
       throw new Error("Autista or Mezzo not found for giro");
     }
     
-    const spedizioni = Array.from(this.spedizioni.values()).filter(s => s.giroId === id);
+    const spedizioniArray = Array.from(this.spedizioni.values()).filter(s => s.giroId === id);
+    
+    const spedizioni: SpedizioneWithDetails[] = spedizioniArray.map(spedizione => {
+      const committente = this.committenti.get(spedizione.committenteId);
+      const destinatario = this.destinatari.get(spedizione.destinatarioId);
+      
+      if (!committente || !destinatario) {
+        throw new Error("Committente or Destinatario not found for spedizione");
+      }
+      
+      return {
+        ...spedizione,
+        committente,
+        destinatario,
+      };
+    });
     
     return {
       ...giro,
@@ -261,19 +324,21 @@ export class MemStorage implements IStorage {
   }
 
   // Spedizioni methods
-  async getAllSpedizioni(): Promise<SpedizioneWithCliente[]> {
+  async getAllSpedizioni(): Promise<SpedizioneWithDetails[]> {
     const spedizioniArray = Array.from(this.spedizioni.values());
     
     return spedizioniArray.map((spedizione) => {
-      const cliente = this.clienti.get(spedizione.clienteId);
+      const committente = this.committenti.get(spedizione.committenteId);
+      const destinatario = this.destinatari.get(spedizione.destinatarioId);
       
-      if (!cliente) {
-        throw new Error("Cliente not found for spedizione");
+      if (!committente || !destinatario) {
+        throw new Error("Committente or Destinatario not found for spedizione");
       }
       
       return {
         ...spedizione,
-        cliente,
+        committente,
+        destinatario,
       };
     });
   }
@@ -294,8 +359,9 @@ export class MemStorage implements IStorage {
       id,
       numeroSpedizione,
       contrassegno: insertSpedizione.contrassegno ?? null,
+      filePath: insertSpedizione.filePath ?? null,
+      note: insertSpedizione.note ?? null,
       giroId: insertSpedizione.giroId ?? null,
-      noteUfficio: insertSpedizione.noteUfficio ?? null,
       stato: insertSpedizione.stato ?? "INSERITA",
     };
     this.spedizioni.set(id, spedizione);

@@ -2,15 +2,18 @@ import { eq, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
-  clienti,
+  committenti,
+  destinatari,
   autisti,
   mezzi,
   giri,
   spedizioni,
   type User,
   type InsertUser,
-  type Cliente,
-  type InsertCliente,
+  type Committente,
+  type InsertCommittente,
+  type Destinatario,
+  type InsertDestinatario,
   type Autista,
   type InsertAutista,
   type Mezzo,
@@ -19,7 +22,7 @@ import {
   type InsertGiro,
   type Spedizione,
   type InsertSpedizione,
-  type SpedizioneWithCliente,
+  type SpedizioneWithDetails,
   type GiroWithDetails,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
@@ -41,32 +44,60 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  // Clienti methods
-  async getAllClienti(): Promise<Cliente[]> {
-    return await db.select().from(clienti).orderBy(clienti.ragioneSociale);
+  // Committenti methods
+  async getAllCommittenti(): Promise<Committente[]> {
+    return await db.select().from(committenti).orderBy(committenti.nome);
   }
 
-  async getCliente(id: string): Promise<Cliente | undefined> {
-    const result = await db.select().from(clienti).where(eq(clienti.id, id)).limit(1);
+  async getCommittente(id: string): Promise<Committente | undefined> {
+    const result = await db.select().from(committenti).where(eq(committenti.id, id)).limit(1);
     return result[0];
   }
 
-  async createCliente(insertCliente: InsertCliente): Promise<Cliente> {
-    const result = await db.insert(clienti).values(insertCliente).returning();
+  async createCommittente(insertCommittente: InsertCommittente): Promise<Committente> {
+    const result = await db.insert(committenti).values(insertCommittente).returning();
     return result[0];
   }
 
-  async updateCliente(id: string, insertCliente: InsertCliente): Promise<Cliente> {
+  async updateCommittente(id: string, insertCommittente: InsertCommittente): Promise<Committente> {
     const result = await db
-      .update(clienti)
-      .set(insertCliente)
-      .where(eq(clienti.id, id))
+      .update(committenti)
+      .set(insertCommittente)
+      .where(eq(committenti.id, id))
       .returning();
     return result[0];
   }
 
-  async deleteCliente(id: string): Promise<void> {
-    await db.delete(clienti).where(eq(clienti.id, id));
+  async deleteCommittente(id: string): Promise<void> {
+    await db.delete(committenti).where(eq(committenti.id, id));
+  }
+
+  // Destinatari methods
+  async getAllDestinatari(): Promise<Destinatario[]> {
+    return await db.select().from(destinatari).orderBy(destinatari.ragioneSociale);
+  }
+
+  async getDestinatario(id: string): Promise<Destinatario | undefined> {
+    const result = await db.select().from(destinatari).where(eq(destinatari.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createDestinatario(insertDestinatario: InsertDestinatario): Promise<Destinatario> {
+    const result = await db.insert(destinatari).values(insertDestinatario).returning();
+    return result[0];
+  }
+
+  async updateDestinatario(id: string, insertDestinatario: InsertDestinatario): Promise<Destinatario> {
+    const result = await db
+      .update(destinatari)
+      .set(insertDestinatario)
+      .where(eq(destinatari.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDestinatario(id: string): Promise<void> {
+    await db.delete(destinatari).where(eq(destinatari.id, id));
   }
 
   // Autisti methods
@@ -167,17 +198,29 @@ export class DbStorage implements IStorage {
 
     const row = result[0];
     
-    // Fetch spedizioni for this giro
+    // Fetch spedizioni for this giro with details
     const spedizioniResult = await db
-      .select()
+      .select({
+        spedizione: spedizioni,
+        committente: committenti,
+        destinatario: destinatari,
+      })
       .from(spedizioni)
+      .leftJoin(committenti, eq(spedizioni.committenteId, committenti.id))
+      .leftJoin(destinatari, eq(spedizioni.destinatarioId, destinatari.id))
       .where(eq(spedizioni.giroId, id));
+
+    const spedizioniWithDetails: SpedizioneWithDetails[] = spedizioniResult.map(s => ({
+      ...s.spedizione,
+      committente: s.committente!,
+      destinatario: s.destinatario!,
+    }));
     
     return {
       ...row.giro,
       autista: row.autista!,
       mezzo: row.mezzo!,
-      spedizioni: spedizioniResult,
+      spedizioni: spedizioniWithDetails,
     };
   }
 
@@ -196,19 +239,22 @@ export class DbStorage implements IStorage {
   }
 
   // Spedizioni methods
-  async getAllSpedizioni(): Promise<SpedizioneWithCliente[]> {
+  async getAllSpedizioni(): Promise<SpedizioneWithDetails[]> {
     const result = await db
       .select({
         spedizione: spedizioni,
-        cliente: clienti,
+        committente: committenti,
+        destinatario: destinatari,
       })
       .from(spedizioni)
-      .leftJoin(clienti, eq(spedizioni.clienteId, clienti.id))
+      .leftJoin(committenti, eq(spedizioni.committenteId, committenti.id))
+      .leftJoin(destinatari, eq(spedizioni.destinatarioId, destinatari.id))
       .orderBy(spedizioni.numeroSpedizione);
 
     return result.map((row) => ({
       ...row.spedizione,
-      cliente: row.cliente!,
+      committente: row.committente!,
+      destinatario: row.destinatario!,
     }));
   }
 

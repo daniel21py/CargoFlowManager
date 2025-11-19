@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getStorage } from "./storage";
-import { insertClienteSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema } from "@shared/schema";
+import { insertClienteSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema, updateSpedizioneStatoSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -247,6 +247,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(spedizione);
     } catch (error) {
       res.status(400).json({ error: "Errore nell'assegnazione" });
+    }
+  });
+
+  app.patch("/api/spedizioni/:id/stato", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const { id } = req.params;
+      const { stato } = updateSpedizioneStatoSchema.parse(req.body);
+      const spedizione = await storage.updateSpedizioneStato(id, stato);
+      res.json(spedizione);
+    } catch (error) {
+      res.status(400).json({ error: "Errore nell'aggiornamento stato" });
     }
   });
 

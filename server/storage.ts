@@ -55,6 +55,7 @@ export interface IStorage {
   getSpedizione(id: string): Promise<Spedizione | undefined>;
   createSpedizione(spedizione: InsertSpedizione): Promise<Spedizione>;
   assignSpedizione(id: string, giroId: string | null): Promise<Spedizione>;
+  updateSpedizioneStato(id: string, stato: string): Promise<Spedizione>;
   getNextNumeroSpedizione(): Promise<number>;
 
   // Stats
@@ -302,6 +303,21 @@ export class MemStorage implements IStorage {
       ...spedizione,
       giroId,
       stato: giroId ? "ASSEGNATA" : "INSERITA",
+    };
+
+    this.spedizioni.set(id, updatedSpedizione);
+    return updatedSpedizione;
+  }
+
+  async updateSpedizioneStato(id: string, stato: string): Promise<Spedizione> {
+    const spedizione = this.spedizioni.get(id);
+    if (!spedizione) {
+      throw new Error("Spedizione not found");
+    }
+
+    const updatedSpedizione: Spedizione = {
+      ...spedizione,
+      stato,
     };
 
     this.spedizioni.set(id, updatedSpedizione);

@@ -112,8 +112,13 @@ export const insertSpedizioneSchema = createInsertSchema(spedizioni).omit({
   numeroSpedizione: true, // Auto-generated
 });
 
+export const updateSpedizioneStatoSchema = z.object({
+  stato: z.enum(["INSERITA", "ASSEGNATA", "IN_CONSEGNA", "CONSEGNATA", "PROBLEMA"]),
+});
+
 export type InsertSpedizione = z.infer<typeof insertSpedizioneSchema>;
 export type Spedizione = typeof spedizioni.$inferSelect;
+export type UpdateSpedizioneStato = z.infer<typeof updateSpedizioneStatoSchema>;
 
 // Extended types with relations for frontend
 export type SpedizioneWithCliente = Spedizione & {

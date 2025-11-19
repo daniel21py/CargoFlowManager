@@ -1,19 +1,58 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { GiroWithDetails } from "@shared/schema";
+
+const STATI_LABELS = {
+  INSERITA: "Inserita",
+  ASSEGNATA: "Assegnata",
+  IN_CONSEGNA: "In Consegna",
+  CONSEGNATA: "Consegnata",
+  PROBLEMA: "Problema",
+} as const;
 
 export default function StampaDDT() {
   const [, params] = useRoute("/stampa-ddt/:id");
   const giroId = params?.id;
+  const { toast } = useToast();
 
   const { data: giro, isLoading } = useQuery<GiroWithDetails>({
     queryKey: ["/api/giri", giroId],
     enabled: !!giroId,
+  });
+
+  const updateStatoMutation = useMutation({
+    mutationFn: async ({ spedizioneId, stato }: { spedizioneId: string; stato: string }) => {
+      const res = await apiRequest("PATCH", `/api/spedizioni/${spedizioneId}/stato`, { stato });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/giri", giroId] });
+      toast({
+        title: "Stato aggiornato",
+        description: "Lo stato della spedizione è stato aggiornato con successo",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Errore",
+        description: "Errore nell'aggiornamento dello stato",
+        variant: "destructive",
+      });
+    },
   });
 
   const handlePrint = () => {
@@ -136,11 +175,12 @@ export default function StampaDDT() {
                   <th className="text-right py-2 px-2 font-semibold">Colli</th>
                   <th className="text-right py-2 px-2 font-semibold">Peso (kg)</th>
                   <th className="text-right py-2 px-2 font-semibold">Contrassegno</th>
+                  <th className="text-left py-2 px-2 font-semibold print:hidden">Stato</th>
                   <th className="text-center py-2 px-2 font-semibold">Firma</th>
                 </tr>
               </thead>
               <tbody>
-                {giro.spedizioni?.map((spedizione, index) => (
+                {giro.spedizioni?.map((spedizione) => (
                   <tr key={spedizione.id} className="border-b">
                     <td className="py-3 px-2">{spedizione.numeroSpedizione}</td>
                     <td className="py-3 px-2">{spedizione.destinatarioNome}</td>
@@ -158,6 +198,34 @@ export default function StampaDDT() {
                       {spedizione.contrassegno ? `€ ${Number(spedizione.contrassegno).toFixed(2)}` : "-"}
                     </td>
                     <td className="py-3 px-2">
+                      <div className="print:hidden">
+                        <Select
+                          value={spedizione.stato}
+                          onValueChange={(newStato) =>
+                            updateStatoMutation.mutate({ spedizioneId: spedizione.id, stato: newStato })
+                          }
+                          disabled={updateStatoMutation.isPending}
+                          data-testid={`select-stato-${spedizione.id}`}
+                        >
+                          <SelectTrigger className="w-full" data-testid={`trigger-stato-${spedizione.id}`}>
+                            <SelectValue>
+                              {STATI_LABELS[spedizione.stato as keyof typeof STATI_LABELS]}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(STATI_LABELS).map(([value, label]) => (
+                              <SelectItem key={value} value={value} data-testid={`option-stato-${value}`}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="hidden print:block">
+                        {STATI_LABELS[spedizione.stato as keyof typeof STATI_LABELS]}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
                       <div className="border border-muted h-8 w-24 mx-auto"></div>
                     </td>
                   </tr>
@@ -170,7 +238,7 @@ export default function StampaDDT() {
                   </td>
                   <td className="py-3 px-2 text-right">{colliTotali}</td>
                   <td className="py-3 px-2 text-right">{pesoTotale}</td>
-                  <td className="py-3 px-2" colSpan={2}></td>
+                  <td className="py-3 px-2" colSpan={3}></td>
                 </tr>
               </tfoot>
             </table>

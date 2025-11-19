@@ -250,6 +250,19 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async updateSpedizioneStato(id: string, stato: string): Promise<Spedizione> {
+    const result = await db
+      .update(spedizioni)
+      .set({ stato })
+      .where(eq(spedizioni.id, id))
+      .returning();
+    
+    if (!result[0]) {
+      throw new Error("Spedizione not found");
+    }
+    return result[0];
+  }
+
   // Stats
   async getStats(): Promise<{
     spedizioniDaAssegnare: number;

@@ -1,0 +1,135 @@
+Voglio che tu mi crei una webapp gestionale di trasporto merci (tipo TMS molto semplice) da usare solo dall’ufficio per la mia azienda di distribuzione nella provincia di Bergamo.
+
+Requisiti generali:
+
+Deve essere una webapp utilizzabile da browser (una sola postazione in ufficio).
+
+Niente ottimizzazione dei giri o tour planning automatico.
+
+Deve avere:
+
+anagrafica clienti
+
+anagrafica autisti
+
+anagrafica mezzi
+
+gestione giri giornalieri degli autisti (giro mattino e giro pomeriggio)
+
+gestione spedizioni con “bollettazione” a partire dal DDT del cliente.
+
+Ogni autista fa massimo 2 giri al giorno: MATTINO e POMERIGGIO.
+
+Voglio una schermata con drag & drop per assegnare le spedizioni agli autisti, tipo colonne: “Da assegnare”, poi una colonna per ogni autista/giro.
+
+Modello dati (proponi tu la tecnologia, ma deve funzionare subito):
+
+Clienti:
+
+ragione sociale
+
+indirizzo, CAP, città, provincia
+
+note
+
+Autisti:
+
+nome, cognome
+
+telefono
+
+zona principale
+
+attivo sì/no
+
+Mezzi:
+
+targa
+
+modello
+
+portata kg
+
+note
+
+Giri:
+
+data
+
+turno (MATTINO o POMERIGGIO)
+
+autista
+
+mezzo
+
+zona / note
+
+Spedizioni:
+
+numero spedizione progressivo generato dal sistema
+
+cliente
+
+data DDT cliente
+
+numero DDT
+
+destinatario (nome, indirizzo, CAP, città, provincia)
+
+colli
+
+peso kg
+
+contrassegno importo (facoltativo)
+
+stato (INSERITA, ASSEGNATA, IN_CONSEGNA, CONSEGNATA, PROBLEMA)
+
+giro assegnato (collegamento al giro)
+
+note ufficio
+
+Schermate che deve creare:
+
+Login molto semplice (un solo utente “ufficio” con password).
+
+Anagrafiche: liste + form di inserimento/modifica per clienti, autisti, mezzi.
+
+Spedizioni:
+
+lista spedizioni con filtri per data, cliente, stato.
+
+form “Nuova spedizione” per inserimento da DDT (cliente, numero DDT, data DDT, dati destinatario, colli, peso, contrassegno, note).
+
+generazione automatica numero spedizione progressivo.
+
+Giri:
+
+possibilità di creare giri per data/autista/turno (mattino/pomeriggio).
+
+Vista pianificazione giornaliera:
+
+seleziono la data e il turno (mattino o pomeriggio).
+
+colonna “Spedizioni non assegnate” per quella data/turno.
+
+una colonna per ogni giro/autista di quella data/turno.
+
+posso trascinare (drag & drop) le spedizioni dalla colonna “non assegnate” alla colonna di un giro/autista e questo deve aggiornare il giro della spedizione nel database.
+
+in ogni colonna mostra almeno: numero spedizione, cliente, città, colli, peso.
+
+Implementazione:
+
+Scegli tu lo stack (ad esempio React + un backend con database tipo SQLite o simile), ma voglio qualcosa che posso usare subito in Replit col pulsante “Run”.
+
+Assicurati che la webapp sia utilizzabile da desktop e che la UI sia semplice e leggibile.
+
+Dopo aver generato l’app, mostrami chiaramente:
+
+come avviare il progetto (pulsante Run)
+
+su che URL locale posso aprire la webapp
+
+dove posso cambiare le credenziali di login.
+
+Se mancano dettagli, fai le scelte più semplici possibili. Voglio una prima versione funzionante che poi posso migliorare con altre richieste.

@@ -128,7 +128,7 @@ export default function Pianificazione() {
   });
 
   const { data: giri, isLoading: isLoadingGiri } = useQuery<GiroWithDetails[]>({
-    queryKey: ["/api/giri", selectedData],
+    queryKey: ["/api/giri/by-date", selectedData],
   });
 
   const assignMutation = useMutation({

@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Plus, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Truck, Plus, Calendar as CalendarIcon, Clock, Printer } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,7 @@ export default function Giri() {
   });
 
   const { data: giri, isLoading } = useQuery<GiroWithDetails[]>({
-    queryKey: ["/api/giri", filterData],
+    queryKey: ["/api/giri/by-date", filterData],
   });
 
   const { data: autisti } = useQuery<Autista[]>({
@@ -45,7 +46,7 @@ export default function Giri() {
   const createMutation = useMutation({
     mutationFn: (data: InsertGiro) => apiRequest("POST", "/api/giri", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/giri"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/giri/by-date"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       toast({ title: "Giro creato con successo" });
       resetForm();
@@ -55,7 +56,7 @@ export default function Giri() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/giri/${id}`, null),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/giri"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/giri/by-date"] });
       toast({ title: "Giro eliminato con successo" });
     },
   });
@@ -168,14 +169,26 @@ export default function Giri() {
                         <p className="text-sm line-clamp-1">{giro.note || "-"}</p>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(giro.id)}
-                          data-testid={`button-delete-${giro.id}`}
-                        >
-                          Elimina
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/stampa-ddt/${giro.id}`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid={`button-print-${giro.id}`}
+                            >
+                              <Printer className="mr-1 h-3 w-3" />
+                              Stampa DDT
+                            </Button>
+                          </Link>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDelete(giro.id)}
+                            data-testid={`button-delete-${giro.id}`}
+                          >
+                            Elimina
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

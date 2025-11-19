@@ -168,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Giri routes
-  app.get("/api/giri/:data", async (req, res) => {
+  app.get("/api/giri/by-date/:data", async (req, res) => {
     try {
       const storage = await getStorage();
       const { data } = req.params;
@@ -176,6 +176,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(giri);
     } catch (error) {
       res.status(500).json({ error: "Errore nel recupero giri" });
+    }
+  });
+
+  app.get("/api/giri/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const { id } = req.params;
+      const giro = await storage.getGiro(id);
+      if (!giro) {
+        return res.status(404).json({ error: "Giro non trovato" });
+      }
+      res.json(giro);
+    } catch (error) {
+      console.error("Error fetching giro:", error);
+      res.status(500).json({ error: "Errore nel recupero giro" });
     }
   });
 

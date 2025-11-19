@@ -150,9 +150,35 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGiro(id: string): Promise<Giro | undefined> {
-    const result = await db.select().from(giri).where(eq(giri.id, id)).limit(1);
-    return result[0];
+  async getGiro(id: string): Promise<GiroWithDetails | undefined> {
+    const result = await db
+      .select({
+        giro: giri,
+        autista: autisti,
+        mezzo: mezzi,
+      })
+      .from(giri)
+      .leftJoin(autisti, eq(giri.autistaId, autisti.id))
+      .leftJoin(mezzi, eq(giri.mezzoId, mezzi.id))
+      .where(eq(giri.id, id))
+      .limit(1);
+
+    if (result.length === 0) return undefined;
+
+    const row = result[0];
+    
+    // Fetch spedizioni for this giro
+    const spedizioniResult = await db
+      .select()
+      .from(spedizioni)
+      .where(eq(spedizioni.giroId, id));
+    
+    return {
+      ...row.giro,
+      autista: row.autista!,
+      mezzo: row.mezzo!,
+      spedizioni: spedizioniResult,
+    };
   }
 
   async createGiro(insertGiro: InsertGiro): Promise<Giro> {

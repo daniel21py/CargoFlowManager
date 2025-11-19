@@ -46,7 +46,7 @@ export interface IStorage {
   // Giri
   getAllGiri(): Promise<Giro[]>;
   getGiriByData(data: string): Promise<GiroWithDetails[]>;
-  getGiro(id: string): Promise<Giro | undefined>;
+  getGiro(id: string): Promise<GiroWithDetails | undefined>;
   createGiro(giro: InsertGiro): Promise<Giro>;
   deleteGiro(id: string): Promise<void>;
 
@@ -211,8 +211,25 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async getGiro(id: string): Promise<Giro | undefined> {
-    return this.giri.get(id);
+  async getGiro(id: string): Promise<GiroWithDetails | undefined> {
+    const giro = this.giri.get(id);
+    if (!giro) return undefined;
+    
+    const autista = this.autisti.get(giro.autistaId);
+    const mezzo = this.mezzi.get(giro.mezzoId);
+    
+    if (!autista || !mezzo) {
+      throw new Error("Autista or Mezzo not found for giro");
+    }
+    
+    const spedizioni = Array.from(this.spedizioni.values()).filter(s => s.giroId === id);
+    
+    return {
+      ...giro,
+      autista,
+      mezzo,
+      spedizioni,
+    };
   }
 
   async createGiro(insertGiro: InsertGiro): Promise<Giro> {

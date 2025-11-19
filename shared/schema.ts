@@ -123,4 +123,5 @@ export type SpedizioneWithCliente = Spedizione & {
 export type GiroWithDetails = Giro & {
   autista: Autista;
   mezzo: Mezzo;
+  spedizioni?: Spedizione[];
 };

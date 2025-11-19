@@ -15,6 +15,7 @@ import Mezzi from "@/pages/mezzi";
 import Spedizioni from "@/pages/spedizioni";
 import Giri from "@/pages/giri";
 import Pianificazione from "@/pages/pianificazione";
+import StampaDDT from "@/pages/stampa-ddt";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -58,6 +59,9 @@ function Router() {
       </Route>
       <Route path="/mezzi">
         <ProtectedRoute component={Mezzi} />
+      </Route>
+      <Route path="/stampa-ddt/:id">
+        <ProtectedRoute component={StampaDDT} />
       </Route>
       <Route component={NotFound} />
     </Switch>

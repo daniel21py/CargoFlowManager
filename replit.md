@@ -76,6 +76,15 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 - Drag & drop nativo per assegnare spedizioni ai giri
 - Aggiornamento automatico dello stato della spedizione
 
+### Distinta Giornaliera
+- Visualizzazione e stampa del riepilogo giornaliero di ogni giro
+- Mostra autista, mezzo, zona assegnata e tutte le spedizioni del giro
+- Tabella spedizioni con numero, destinatario, indirizzo, colli, peso, contrassegno
+- **Gestione stati spedizioni**: dropdown per esitare ogni spedizione (Inserita, Assegnata, In Consegna, Consegnata, Problema)
+- Aggiornamento stato in tempo reale con salvataggio automatico
+- Area firma autista e azienda
+- Versione stampabile (nasconde dropdown, mostra stati in forma testuale)
+
 ## Credenziali di Default
 - **Username**: ufficio
 - **Password**: password123
@@ -115,6 +124,7 @@ client/
       spedizioni.tsx         # Gestione spedizioni
       giri.tsx               # Gestione giri
       pianificazione.tsx     # Drag & drop pianificazione
+      stampa-ddt.tsx         # Distinta giornaliera con esito spedizioni
     App.tsx                  # Router e autenticazione
     index.css               # Stili globali
 server/
@@ -134,5 +144,8 @@ shared/
 - CRUD `/api/autisti` - Gestione autisti
 - CRUD `/api/mezzi` - Gestione mezzi
 - CRUD `/api/giri` - Gestione giri
+- `GET /api/giri/by-date/:data` - Recupera giri per data specifica
+- `GET /api/giri/:id` - Recupera singolo giro con spedizioni assegnate
 - CRUD `/api/spedizioni` - Gestione spedizioni
 - `PUT /api/spedizioni/:id/assign` - Assegna spedizione a giro
+- `PATCH /api/spedizioni/:id/stato` - Aggiorna stato spedizione (INSERITA, ASSEGNATA, IN_CONSEGNA, CONSEGNATA, PROBLEMA)

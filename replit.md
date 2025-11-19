@@ -8,6 +8,9 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 - **Backend**: Express.js, Node.js
 - **Database**: PostgreSQL (Neon) con Drizzle ORM
 - **Drag & Drop**: @dnd-kit
+- **OCR**: Tesseract.js (per immagini)
+- **PDF Parsing**: pdf-parse (per file PDF)
+- **AI**: Replit AI Integrations con OpenAI GPT (per parsing strutturato dati DDT)
 
 ## Struttura Database
 
@@ -75,7 +78,12 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 - Form di creazione con selezione committente e destinatario da anagrafica
 - Numero spedizione auto-generato
 - Badge colorati per gli stati
-- Campo per upload allegato DDT (preparato per implementazione futura)
+- **Importa DDT**: funzionalità OCR + AI per estrazione automatica dati da file PDF/JPG/PNG
+  - Upload file DDT (max 10MB)
+  - OCR automatico con Tesseract.js (immagini) e pdf-parse (PDF)
+  - Parsing intelligente con OpenAI GPT per estrazione dati strutturati
+  - Precompilazione automatica form spedizioni
+  - Fallback manuale in caso di errore
 
 ### Giri
 - Gestione giri giornalieri per data
@@ -138,6 +146,7 @@ client/
       giri.tsx               # Gestione giri
       pianificazione.tsx     # Drag & drop pianificazione
       stampa-ddt.tsx         # Distinta giornaliera con esito spedizioni
+      importa-ddt.tsx        # Import DDT con OCR + AI
     App.tsx                  # Router e autenticazione
     index.css               # Stili globali
 server/
@@ -146,6 +155,8 @@ server/
   db-storage.ts             # Implementazione PostgreSQL
   db.ts                     # Connessione database
   seed.ts                   # Script di seed database
+  ocr-service.ts            # Servizio OCR (Tesseract.js + pdf-parse)
+  ai-service.ts             # Servizio AI parsing (OpenAI GPT)
 shared/
   schema.ts                 # Schemi Drizzle ORM e tipi TypeScript
 ```
@@ -163,3 +174,4 @@ shared/
 - CRUD `/api/spedizioni` - Gestione spedizioni
 - `PUT /api/spedizioni/:id/assign` - Assegna spedizione a giro
 - `PATCH /api/spedizioni/:id/stato` - Aggiorna stato spedizione (INSERITA, ASSEGNATA, IN_CONSEGNA, CONSEGNATA, PROBLEMA)
+- `POST /api/import-ddt` - Import DDT con OCR + AI (file upload multipart/form-data, max 10MB, PDF/JPG/PNG)

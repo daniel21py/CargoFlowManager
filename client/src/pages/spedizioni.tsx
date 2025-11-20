@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -31,6 +31,7 @@ export default function Spedizioni() {
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStato, setFilterStato] = useState<string>("ALL");
+  const [filterCommittente, setFilterCommittente] = useState<string>("ALL");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<InsertSpedizione>({
     committenteId: "",
@@ -45,6 +46,19 @@ export default function Spedizioni() {
     giroId: null,
     note: "",
   });
+
+  const recentWindow = useMemo(() => {
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+    return {
+      today: todayStr,
+      yesterday: yesterdayStr,
+      values: new Set([todayStr, yesterdayStr]),
+    };
+  }, []);
 
   // Check for prefilled data from import DDT via localStorage (more reliable than history state)
   useEffect(() => {
@@ -136,13 +150,18 @@ export default function Spedizioni() {
   };
 
 
+  const isRecentFilterActive =
+    !searchTerm && filterStato === "ALL" && filterCommittente === "ALL";
+
   const filteredSpedizioni = spedizioni?.filter((s) => {
     const matchesSearch =
       s.numeroSpedizione.toString().includes(searchTerm) ||
       s.committente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.destinatario.citta.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStato = filterStato === "ALL" || s.stato === filterStato;
-    return matchesSearch && matchesStato;
+    const matchesCommittente = filterCommittente === "ALL" || s.committenteId === filterCommittente;
+    const matchesRecent = !isRecentFilterActive || recentWindow.values.has(s.dataDDT);
+    return matchesSearch && matchesStato && matchesCommittente && matchesRecent;
   });
 
   return (
@@ -158,34 +177,53 @@ export default function Spedizioni() {
         </Button>
       </div>
 
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cerca per numero, committente o città..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            data-testid="input-search"
-          />
+        <div className="flex flex-wrap gap-4">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cerca per numero, committente o città..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              data-testid="input-search"
+            />
+          </div>
+          <Select value={filterCommittente} onValueChange={setFilterCommittente}>
+            <SelectTrigger className="w-60" data-testid="select-filter-committente">
+              <SelectValue placeholder="Tutti i committenti" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tutti i committenti</SelectItem>
+              {committenti?.map((committente) => (
+                <SelectItem key={committente.id} value={committente.id}>
+                  {committente.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterStato} onValueChange={setFilterStato}>
+            <SelectTrigger className="w-48" data-testid="select-filter-stato">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <SelectValue placeholder="Tutti gli stati" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tutti gli stati</SelectItem>
+              <SelectItem value="INSERITA">Inserita</SelectItem>
+              <SelectItem value="ASSEGNATA">Assegnata</SelectItem>
+              <SelectItem value="IN_CONSEGNA">In Consegna</SelectItem>
+              <SelectItem value="CONSEGNATA">Consegnata</SelectItem>
+              <SelectItem value="PROBLEMA">Problema</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={filterStato} onValueChange={setFilterStato}>
-          <SelectTrigger className="w-48" data-testid="select-filter-stato">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <SelectValue />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Tutti gli stati</SelectItem>
-            <SelectItem value="INSERITA">Inserita</SelectItem>
-            <SelectItem value="ASSEGNATA">Assegnata</SelectItem>
-            <SelectItem value="IN_CONSEGNA">In Consegna</SelectItem>
-            <SelectItem value="CONSEGNATA">Consegnata</SelectItem>
-            <SelectItem value="PROBLEMA">Problema</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+        {isRecentFilterActive && (
+          <p className="text-xs text-muted-foreground">
+            Mostrati solo i DDT di oggi ({recentWindow.today}) e ieri ({recentWindow.yesterday}). Usa i filtri per
+            estendere l'intervallo.
+          </p>
+        )}
 
       {isLoading ? (
         <Card>

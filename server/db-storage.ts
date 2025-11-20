@@ -174,11 +174,11 @@ export class DbStorage implements IStorage {
       .where(eq(giri.data, data))
       .orderBy(giri.turno);
 
-    return result.map((row) => ({
-      ...row.giro,
-      autista: row.autista!,
-      mezzo: row.mezzo!,
-    }));
+      return result.map((row) => ({
+        ...row.giro,
+        autista: row.autista!,
+        mezzo: row.mezzo ?? null,
+      }));
   }
 
   async getGiro(id: string): Promise<GiroWithDetails | undefined> {
@@ -216,12 +216,12 @@ export class DbStorage implements IStorage {
       destinatario: s.destinatario!,
     }));
     
-    return {
-      ...row.giro,
-      autista: row.autista!,
-      mezzo: row.mezzo!,
-      spedizioni: spedizioniWithDetails,
-    };
+      return {
+        ...row.giro,
+        autista: row.autista!,
+        mezzo: row.mezzo ?? null,
+        spedizioni: spedizioniWithDetails,
+      };
   }
 
   async createGiro(insertGiro: InsertGiro): Promise<Giro> {

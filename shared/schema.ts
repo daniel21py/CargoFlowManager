@@ -52,23 +52,6 @@ export const insertDestinatarioSchema = createInsertSchema(destinatari).omit({
 export type InsertDestinatario = z.infer<typeof insertDestinatarioSchema>;
 export type Destinatario = typeof destinatari.$inferSelect;
 
-// Autisti (Drivers)
-export const autisti = pgTable("autisti", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  nome: text("nome").notNull(),
-  cognome: text("cognome").notNull(),
-  telefono: text("telefono").notNull(),
-  zonaPrincipale: text("zona_principale").notNull(),
-  attivo: boolean("attivo").notNull().default(true),
-});
-
-export const insertAutistaSchema = createInsertSchema(autisti).omit({
-  id: true,
-});
-
-export type InsertAutista = z.infer<typeof insertAutistaSchema>;
-export type Autista = typeof autisti.$inferSelect;
-
 // Mezzi (Vehicles)
 export const mezzi = pgTable("mezzi", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -85,13 +68,31 @@ export const insertMezzoSchema = createInsertSchema(mezzi).omit({
 export type InsertMezzo = z.infer<typeof insertMezzoSchema>;
 export type Mezzo = typeof mezzi.$inferSelect;
 
+// Autisti (Drivers)
+export const autisti = pgTable("autisti", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: text("nome").notNull(),
+  cognome: text("cognome").notNull(),
+  telefono: text("telefono").notNull(),
+  zonaPrincipale: text("zona_principale").notNull(),
+  attivo: boolean("attivo").notNull().default(true),
+  mezzoPreferitoId: varchar("mezzo_preferito_id").references(() => mezzi.id),
+});
+
+export const insertAutistaSchema = createInsertSchema(autisti).omit({
+  id: true,
+});
+
+export type InsertAutista = z.infer<typeof insertAutistaSchema>;
+export type Autista = typeof autisti.$inferSelect;
+
 // Giri (Delivery Rounds)
 export const giri = pgTable("giri", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   data: date("data").notNull(),
   turno: text("turno").notNull(), // MATTINO or POMERIGGIO
   autistaId: varchar("autista_id").notNull().references(() => autisti.id),
-  mezzoId: varchar("mezzo_id").notNull().references(() => mezzi.id),
+  mezzoId: varchar("mezzo_id").references(() => mezzi.id),
   zona: text("zona"),
   note: text("note"),
 });
@@ -141,6 +142,6 @@ export type SpedizioneWithDetails = Spedizione & {
 
 export type GiroWithDetails = Giro & {
   autista: Autista;
-  mezzo: Mezzo;
+  mezzo?: Mezzo | null;
   spedizioni?: SpedizioneWithDetails[];
 };

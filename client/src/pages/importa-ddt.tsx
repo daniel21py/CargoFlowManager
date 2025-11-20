@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Upload, FileText, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { Upload, FileText, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { InsertSpedizione } from "@shared/schema";
 
 interface DDTData {
   committente?: string;
@@ -22,10 +26,37 @@ interface DDTData {
   contrassegno?: number;
 }
 
+interface CandidateResult {
+  pageNumber: number;
+  data?: (DDTData & { committenteId?: string; destinatarioId?: string }) | null;
+  metadata?: {
+    committenteMapped?: boolean;
+    destinatarioMapped?: boolean;
+    destinatarioCreated?: boolean;
+    destinatarioError?: string;
+  };
+  committenteId?: string | null;
+  destinatarioId?: string | null;
+  error?: string;
+  status?: "pending" | "saved" | "error";
+}
+
+interface ImportResponse {
+  success: boolean;
+  candidates: CandidateResult[];
+  summary?: {
+    totalPages: number;
+    processedPages: number;
+    pagesWithErrors: number;
+  };
+}
+
 export default function ImportaDDT() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [extractedData, setExtractedData] = useState<DDTData | null>(null);
+  const [candidates, setCandidates] = useState<CandidateResult[]>([]);
+  const [savingPages, setSavingPages] = useState<number[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -33,15 +64,17 @@ export default function ImportaDDT() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      const validTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
       if (!validTypes.includes(file.type)) {
-        setError('Tipo di file non supportato. Usa PDF, JPG o PNG');
+        setError("Tipo di file non supportato. Usa PDF, JPG o PNG");
         setSelectedFile(null);
         return;
       }
       setSelectedFile(file);
       setError(null);
-      setExtractedData(null);
+      setCandidates([]);
+      setSavingPages([]);
+      setBulkSaving(false);
     }
   };
 
@@ -53,46 +86,38 @@ export default function ImportaDDT() {
 
     try {
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      formData.append("file", selectedFile);
 
-      const response = await fetch('/api/import-ddt', {
-        method: 'POST',
+      const response = await fetch("/api/import-ddt", {
+        method: "POST",
         body: formData,
       });
 
-      const result = await response.json();
+      const result: ImportResponse = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Errore durante il processamento');
+        throw new Error((result as any).error || "Errore durante il processamento");
       }
 
-      setExtractedData(result.data);
-      
-      // Messaggio personalizzato in base ai risultati del mapping
-      const metadata = result.metadata || {};
-      let description = "I dati sono stati estratti. ";
-      
-      if (metadata.committenteMapped) {
-        description += "Committente riconosciuto. ";
-      }
-      if (metadata.destinatarioMapped) {
-        description += "Destinatario trovato. ";
-      } else if (metadata.destinatarioCreated) {
-        description += "Nuovo destinatario creato. ";
-      }
-      if (metadata.destinatarioError) {
-        description += "Attenzione: " + metadata.destinatarioError + " ";
-      }
-      
-      description += "Controlla e salva la spedizione.";
-      
+      const normalized = (result.candidates || []).map((candidate) => ({
+        ...candidate,
+        status: candidate.error ? "error" : "pending",
+      }));
+
+      setCandidates(normalized);
+
+      const readyCount = normalized.filter((candidate) => !candidate.error).length;
+      const errorCount = normalized.length - readyCount;
       toast({
-        title: "DDT processato con successo",
-        description,
+        title: "File elaborato",
+        description:
+          normalized.length === 0
+            ? "Nessun DDT riconosciuto. Prova con un file differente."
+            : `${readyCount} candidato/i pronto/i, ${errorCount} con avvisi`,
       });
     } catch (err: any) {
-      console.error('Errore import DDT:', err);
-      setError(err.message || 'Errore durante il processamento del file');
+      console.error("Errore import DDT:", err);
+      setError(err.message || "Errore durante il processamento del file");
       toast({
         title: "Errore",
         description: err.message || "Impossibile processare il DDT",
@@ -103,15 +128,163 @@ export default function ImportaDDT() {
     }
   };
 
-  const handleCreateSpedizione = () => {
-    if (!extractedData) return;
-    
-    // Store prefilled data in localStorage for more reliable transfer
-    localStorage.setItem('ddtImportData', JSON.stringify(extractedData));
-    
-    // Navigate to spedizioni page
-    navigate('/spedizioni');
+  const getCommittenteId = (candidate: CandidateResult) =>
+    candidate.committenteId || candidate.data?.committenteId || "";
+
+  const getDestinatarioId = (candidate: CandidateResult) =>
+    candidate.destinatarioId || candidate.data?.destinatarioId || "";
+
+  const canAutoSaveCandidate = (candidate: CandidateResult) =>
+    !!candidate.data &&
+    !candidate.error &&
+    candidate.status !== "saved" &&
+    !!getCommittenteId(candidate) &&
+    !!getDestinatarioId(candidate);
+
+  const setPageSaving = (pageNumber: number, saving: boolean) => {
+    setSavingPages((prev) =>
+      saving ? [...prev, pageNumber] : prev.filter((num) => num !== pageNumber),
+    );
   };
+
+  const handleEditCandidate = (candidate: CandidateResult) => {
+    if (!candidate.data) {
+      toast({
+        title: "Dati mancanti",
+        description: "Questa pagina non contiene informazioni sufficienti da modificare.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const payload = {
+      committenteId: getCommittenteId(candidate),
+      destinatarioId: getDestinatarioId(candidate),
+      dataDDT: candidate.data.dataDDT || new Date().toISOString().split("T")[0],
+      numeroDDT: candidate.data.numeroDDT || "",
+      colli: candidate.data.colli || 1,
+      pesoKg: candidate.data.peso ? candidate.data.peso.toString() : "0",
+      contrassegno: candidate.data.contrassegno ? candidate.data.contrassegno.toFixed(2) : null,
+      note: `Importato da PDF - Pagina ${candidate.pageNumber}`,
+    };
+
+    localStorage.setItem("ddtImportData", JSON.stringify(payload));
+    navigate("/spedizioni");
+  };
+
+  const handleDiscardCandidate = (pageNumber: number) => {
+    setCandidates((prev) => prev.filter((candidate) => candidate.pageNumber !== pageNumber));
+  };
+
+  const handleConfirmCandidate = async (
+    candidate: CandidateResult,
+    options?: { silent?: boolean },
+  ): Promise<boolean> => {
+    if (!candidate.data) {
+      toast({
+        title: "Dati incompleti",
+        description: "Impossibile creare la spedizione senza i dati minimi.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const committenteId = getCommittenteId(candidate);
+    const destinatarioId = getDestinatarioId(candidate);
+    if (!committenteId || !destinatarioId) {
+      toast({
+        title: "Mappature mancanti",
+        description: "Associa manualmente committente e destinatario prima di salvare.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const page = candidate.pageNumber;
+    setPageSaving(page, true);
+
+    try {
+      const payload: InsertSpedizione = {
+        committenteId,
+        destinatarioId,
+        dataDDT: candidate.data.dataDDT || new Date().toISOString().split("T")[0],
+        numeroDDT: candidate.data.numeroDDT || `PDF-${page}-${Date.now()}`,
+        colli: candidate.data.colli || 1,
+        pesoKg: candidate.data.peso ? candidate.data.peso.toString() : "0",
+        contrassegno: candidate.data.contrassegno
+          ? candidate.data.contrassegno.toFixed(2)
+          : null,
+        filePath: null,
+        note: `Importato automaticamente (Pagina ${page})`,
+        stato: "INSERITA",
+        giroId: null,
+      };
+
+      await apiRequest("POST", "/api/spedizioni", payload);
+      queryClient.invalidateQueries({ queryKey: ["/api/spedizioni"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+
+      setCandidates((prev) =>
+        prev.map((c) => (c.pageNumber === page ? { ...c, status: "saved" } : c)),
+      );
+
+      if (!options?.silent) {
+        toast({
+          title: "Spedizione creata",
+          description: `Pagina ${page} salvata correttamente`,
+        });
+      }
+      return true;
+    } catch (err: any) {
+      setCandidates((prev) =>
+        prev.map((c) =>
+          c.pageNumber === page
+            ? {
+                ...c,
+                status: "error",
+                error: err.message || "Errore durante il salvataggio",
+              }
+            : c,
+        ),
+      );
+      if (!options?.silent) {
+        toast({
+          title: "Errore",
+          description: err.message || "Impossibile salvare la spedizione",
+          variant: "destructive",
+        });
+      }
+      return false;
+    } finally {
+      setPageSaving(page, false);
+    }
+  };
+
+  const handleConfirmAll = async () => {
+    setBulkSaving(true);
+    let successCount = 0;
+
+    for (const candidate of candidates) {
+      if (!canAutoSaveCandidate(candidate)) continue;
+      const success = await handleConfirmCandidate(candidate, { silent: true });
+      if (success) successCount++;
+    }
+
+    setBulkSaving(false);
+    toast({
+      title: successCount > 0 ? "Conferma completata" : "Nessuna spedizione creata",
+      description:
+        successCount > 0
+          ? `${successCount} spedizioni generate automaticamente`
+          : "Verifica i dati estratti e riprova.",
+      variant: successCount > 0 ? "default" : "destructive",
+    });
+  };
+
+  const readyCount = candidates.filter((candidate) => !candidate.error).length;
+  const errorCount = candidates.filter((candidate) => candidate.error).length;
+  const hasConfirmableCandidates = candidates.some(canAutoSaveCandidate);
+  const isSavingPage = (pageNumber: number) => savingPages.includes(pageNumber);
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
@@ -174,131 +347,182 @@ export default function ImportaDDT() {
             </Alert>
           )}
 
-          {/* Process button */}
-          {selectedFile && !extractedData && (
-            <Button
-              onClick={handleProcessFile}
-              disabled={isProcessing}
-              className="w-full"
-              size="lg"
-              data-testid="button-process-ddt"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Elaborazione in corso...
-                </>
-              ) : (
-                <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Elabora DDT con OCR + AI
-                </>
-              )}
-            </Button>
-          )}
+            {/* Process button */}
+            {selectedFile && (
+              <Button
+                onClick={handleProcessFile}
+                disabled={isProcessing}
+                className="w-full"
+                size="lg"
+                data-testid="button-process-ddt"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Elaborazione in corso...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Elabora DDT con OCR + AI
+                  </>
+                )}
+              </Button>
+            )}
 
-          {/* Extracted data preview */}
-          {extractedData && (
-            <div className="space-y-4">
-              <Alert data-testid="alert-success">
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Dati estratti con successo! Controlla i campi e procedi con la creazione della spedizione.
-                </AlertDescription>
-              </Alert>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Dati Estratti</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {extractedData.committente && (
-                    <div>
-                      <span className="text-sm font-medium text-muted-foreground">Committente:</span>
-                      <p className="font-medium" data-testid="text-committente">{extractedData.committente}</p>
-                    </div>
-                  )}
-                  
-                  {extractedData.destinatario && (
-                    <div>
-                      <span className="text-sm font-medium text-muted-foreground">Destinatario:</span>
-                      <div className="mt-1 space-y-1">
-                        {extractedData.destinatario.ragioneSociale && (
-                          <p className="font-medium" data-testid="text-destinatario-ragione">
-                            {extractedData.destinatario.ragioneSociale}
-                          </p>
-                        )}
-                        {extractedData.destinatario.indirizzo && (
-                          <p className="text-sm">{extractedData.destinatario.indirizzo}</p>
-                        )}
-                        {(extractedData.destinatario.cap || extractedData.destinatario.citta || extractedData.destinatario.provincia) && (
-                          <p className="text-sm">
-                            {extractedData.destinatario.cap} {extractedData.destinatario.citta} ({extractedData.destinatario.provincia})
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    {extractedData.dataDDT && (
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Data DDT:</span>
-                        <p className="font-medium" data-testid="text-data-ddt">{extractedData.dataDDT}</p>
-                      </div>
-                    )}
-                    {extractedData.numeroDDT && (
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Numero DDT:</span>
-                        <p className="font-medium" data-testid="text-numero-ddt">{extractedData.numeroDDT}</p>
-                      </div>
-                    )}
-                    {extractedData.colli !== undefined && (
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Colli:</span>
-                        <p className="font-medium" data-testid="text-colli">{extractedData.colli}</p>
-                      </div>
-                    )}
-                    {extractedData.peso !== undefined && (
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Peso:</span>
-                        <p className="font-medium" data-testid="text-peso">{extractedData.peso} kg</p>
-                      </div>
-                    )}
-                    {extractedData.contrassegno !== undefined && (
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Contrassegno:</span>
-                        <p className="font-medium" data-testid="text-contrassegno">€ {extractedData.contrassegno.toFixed(2)}</p>
-                      </div>
-                    )}
+            {candidates.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className="font-semibold">{candidates.length} pagine analizzate</p>
+                    <p className="text-sm text-muted-foreground">
+                      {readyCount} con dati utili · {errorCount} con avvisi
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setCandidates([]);
+                        setSavingPages([]);
+                      }}
+                      data-testid="button-reset-candidates"
+                    >
+                      Svuota elenco
+                    </Button>
+                    <Button
+                      onClick={handleConfirmAll}
+                      disabled={bulkSaving || !hasConfirmableCandidates}
+                      data-testid="button-confirm-all"
+                    >
+                      {bulkSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Conferma tutti
+                    </Button>
+                  </div>
+                </div>
 
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleCreateSpedizione}
-                  className="flex-1"
-                  size="lg"
-                  data-testid="button-create-spedizione"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Crea Spedizione
-                </Button>
-                <Button
-                  onClick={() => {
-                    setExtractedData(null);
-                    setSelectedFile(null);
-                  }}
-                  variant="outline"
-                  size="lg"
-                  data-testid="button-reset"
-                >
-                  Annulla
-                </Button>
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Pagina</TableHead>
+                          <TableHead>Committente</TableHead>
+                          <TableHead>Destinatario</TableHead>
+                          <TableHead>Data DDT</TableHead>
+                          <TableHead>Numero DDT</TableHead>
+                          <TableHead>Colli</TableHead>
+                          <TableHead>Peso (kg)</TableHead>
+                          <TableHead className="text-right">Azioni</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {candidates.map((candidate) => {
+                          const canAutoSave = canAutoSaveCandidate(candidate);
+                          const saving = isSavingPage(candidate.pageNumber);
+                          return (
+                            <TableRow
+                              key={candidate.pageNumber}
+                              className={candidate.status === "saved" ? "bg-muted/50" : undefined}
+                              data-testid={`row-candidate-${candidate.pageNumber}`}
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <span>Pagina {candidate.pageNumber}</span>
+                                  {candidate.status === "saved" && (
+                                    <Badge variant="secondary">Salvato</Badge>
+                                  )}
+                                  {candidate.error && <Badge variant="destructive">Errore</Badge>}
+                                </div>
+                                {candidate.error && (
+                                  <p className="text-xs text-destructive mt-1">{candidate.error}</p>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-medium">{candidate.data?.committente || "—"}</p>
+                                  {candidate.metadata?.committenteMapped && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Mappato
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-medium">
+                                    {candidate.data?.destinatario?.ragioneSociale || "—"}
+                                  </p>
+                                  {candidate.data?.destinatario?.citta && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {candidate.data.destinatario.citta} (
+                                      {candidate.data.destinatario.provincia})
+                                    </p>
+                                  )}
+                                  {candidate.metadata?.destinatarioMapped && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Mappato
+                                    </Badge>
+                                  )}
+                                  {candidate.metadata?.destinatarioCreated && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Creato automaticamente
+                                    </Badge>
+                                  )}
+                                  {candidate.metadata?.destinatarioError && (
+                                    <p className="text-xs text-amber-600">
+                                      {candidate.metadata.destinatarioError}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{candidate.data?.dataDDT || "—"}</TableCell>
+                              <TableCell>{candidate.data?.numeroDDT || "—"}</TableCell>
+                              <TableCell>{candidate.data?.colli ?? "—"}</TableCell>
+                              <TableCell>{candidate.data?.peso ?? "—"}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2 flex-wrap">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditCandidate(candidate)}
+                                    data-testid={`button-edit-candidate-${candidate.pageNumber}`}
+                                  >
+                                    Modifica
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleConfirmCandidate(candidate)}
+                                    disabled={!canAutoSave || saving}
+                                    data-testid={`button-save-candidate-${candidate.pageNumber}`}
+                                  >
+                                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Conferma e salva
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDiscardCandidate(candidate.pageNumber)}
+                                    data-testid={`button-discard-candidate-${candidate.pageNumber}`}
+                                  >
+                                    Scarta
+                                  </Button>
+                                </div>
+                                {!canAutoSave && !candidate.error && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Completa le anagrafiche tramite Modifica prima di salvare.
+                                  </p>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
-          )}
+            )}
         </CardContent>
       </Card>
 

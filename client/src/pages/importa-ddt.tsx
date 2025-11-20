@@ -67,9 +67,28 @@ export default function ImportaDDT() {
       }
 
       setExtractedData(result.data);
+      
+      // Messaggio personalizzato in base ai risultati del mapping
+      const metadata = result.metadata || {};
+      let description = "I dati sono stati estratti. ";
+      
+      if (metadata.committenteMapped) {
+        description += "Committente riconosciuto. ";
+      }
+      if (metadata.destinatarioMapped) {
+        description += "Destinatario trovato. ";
+      } else if (metadata.destinatarioCreated) {
+        description += "Nuovo destinatario creato. ";
+      }
+      if (metadata.destinatarioError) {
+        description += "Attenzione: " + metadata.destinatarioError + " ";
+      }
+      
+      description += "Controlla e salva la spedizione.";
+      
       toast({
         title: "DDT processato con successo",
-        description: "I dati sono stati estratti. Controlla e salva la spedizione.",
+        description,
       });
     } catch (err: any) {
       console.error('Errore import DDT:', err);
@@ -107,7 +126,7 @@ export default function ImportaDDT() {
         <CardHeader>
           <CardTitle>Carica Documento DDT</CardTitle>
           <CardDescription>
-            Formati supportati: PDF, JPG, PNG
+            Formati supportati: PDF, JPG, PNG (max 25 MB)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

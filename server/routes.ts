@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getStorage } from "./storage";
-import { insertCommittenteSchema, insertDestinatarioSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema, updateSpedizioneStatoSchema } from "@shared/schema";
+import { insertCommittenteSchema, insertDestinatarioSchema, insertAutistaSchema, insertMezzoSchema, insertGiroSchema, insertSpedizioneSchema, updateSpedizioneStatoSchema, type InsertDestinatario } from "@shared/schema";
 import multer from "multer";
 import { extractTextFromDDT } from "./ocr-service";
 import { parseDDTWithAI } from "./ai-service";
@@ -314,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const upload = multer({ 
     storage: multer.memoryStorage(),
     limits: {
-      fileSize: 10 * 1024 * 1024, // Max 10MB
+      fileSize: 25 * 1024 * 1024, // Max 25MB (aumentato da 10MB)
     },
     fileFilter: (_req, file, cb) => {
       const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
@@ -333,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(413).json({ 
             error: "File troppo grande", 
-            details: "La dimensione massima consentita è 10MB",
+            details: "La dimensione massima consentita è 25MB",
             allowManualEntry: true 
           });
         }
@@ -400,10 +400,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Return parsed data
+      // Step 3: Smart mapping committente
+      const storage = await getStorage();
+      let committenteId: string | undefined;
+      
+      if (ddtData.committente) {
+        // Cerca committente per nome con matching flessibile (case-insensitive, contains)
+        const committenti = await storage.getAllCommittenti();
+        const committenteNome = ddtData.committente.toLowerCase().trim();
+        
+        // Prova prima match esatto, poi contains
+        let committenteMatch = committenti.find(c => 
+          c.nome.toLowerCase().trim() === committenteNome
+        );
+        
+        // Se non trova match esatto, prova con contains (per gestire "Cati S.p.A." → "Cati")
+        if (!committenteMatch) {
+          committenteMatch = committenti.find(c => {
+            const nome = c.nome.toLowerCase().trim();
+            return committenteNome.includes(nome) || nome.includes(committenteNome);
+          });
+        }
+        
+        if (committenteMatch) {
+          committenteId = committenteMatch.id;
+          console.log(`Committente mappato: ${committenteMatch.nome} (ID: ${committenteId})`);
+        } else {
+          console.log(`Committente non trovato per: ${ddtData.committente}`);
+        }
+      }
+
+      // Step 4: Smart mapping/creation destinatario
+      let destinatarioId: string | undefined;
+      let destinatarioCreated = false;
+      let destinatarioError: string | undefined;
+      
+      if (ddtData.destinatario?.ragioneSociale && ddtData.destinatario?.citta) {
+        // Cerca destinatario per ragione sociale + città (case-insensitive)
+        const destinatari = await storage.getAllDestinatari();
+        const ragioneSocialeNorm = ddtData.destinatario.ragioneSociale.toLowerCase().trim();
+        const cittaNorm = ddtData.destinatario.citta.toLowerCase().trim();
+        
+        const destinatarioMatch = destinatari.find(d => 
+          d.ragioneSociale.toLowerCase().trim() === ragioneSocialeNorm &&
+          d.citta.toLowerCase().trim() === cittaNorm
+        );
+        
+        if (destinatarioMatch) {
+          // Destinatario esistente trovato
+          destinatarioId = destinatarioMatch.id;
+          console.log(`Destinatario trovato: ${destinatarioMatch.ragioneSociale} (ID: ${destinatarioId})`);
+        } else {
+          // Crea nuovo destinatario con validazione schema
+          try {
+            // Validazione dati prima di creare
+            const insertData: InsertDestinatario = {
+              ragioneSociale: ddtData.destinatario.ragioneSociale.trim(),
+              indirizzo: ddtData.destinatario.indirizzo?.trim() || 'Da verificare',
+              cap: ddtData.destinatario.cap?.trim() || '00000',
+              citta: ddtData.destinatario.citta.trim(),
+              provincia: ddtData.destinatario.provincia?.trim() || 'XX',
+              zona: null, // Zona da assegnare manualmente dopo
+              note: 'Creato automaticamente da import DDT - verificare dati',
+            };
+            
+            // Validazione schema
+            const validated = insertDestinatarioSchema.parse(insertData);
+            const nuovoDestinatario = await storage.createDestinatario(validated);
+            
+            destinatarioId = nuovoDestinatario.id;
+            destinatarioCreated = true;
+            console.log(`Nuovo destinatario creato: ${nuovoDestinatario.ragioneSociale} (ID: ${destinatarioId})`);
+          } catch (createError: any) {
+            console.error('Errore creazione destinatario:', createError);
+            destinatarioError = createError.message || 'Impossibile creare il destinatario';
+            // Non bloccare l'import se fallisce la creazione
+          }
+        }
+      }
+
+      // Return parsed data with mapped IDs and metadata
+      // Costruisci oggetto response esplicito per garantire presenza di tutti i campi
+      const responseData = {
+        // Dati estratti dall'AI
+        committente: ddtData.committente,
+        destinatario: ddtData.destinatario,
+        dataDDT: ddtData.dataDDT,
+        numeroDDT: ddtData.numeroDDT,
+        colli: ddtData.colli,
+        peso: ddtData.peso,
+        contrassegno: ddtData.contrassegno,
+        // ID mappati/creati
+        committenteId: committenteId || undefined,
+        destinatarioId: destinatarioId || undefined,
+      };
+      
       res.json({
         success: true,
-        data: ddtData,
+        data: responseData,
+        metadata: {
+          committenteMapped: !!committenteId,
+          destinatarioMapped: !!destinatarioId && !destinatarioCreated,
+          destinatarioCreated,
+          destinatarioError,
+        },
         extractedText
       });
     } catch (error: any) {

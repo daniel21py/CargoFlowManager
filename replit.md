@@ -79,10 +79,12 @@ Sistema gestionale completo per azienda di trasporto merci nella provincia di Be
 - Numero spedizione auto-generato
 - Badge colorati per gli stati
 - **Importa DDT**: funzionalità OCR + AI per estrazione automatica dati da file PDF/JPG/PNG
-  - Upload file DDT (max 10MB)
+  - Upload file DDT (max 25MB)
   - OCR automatico con Tesseract.js (immagini) e pdf-parse (PDF)
   - Parsing intelligente con OpenAI GPT per estrazione dati strutturati
-  - Precompilazione automatica form spedizioni
+  - **Smart mapping committenti**: riconosce automaticamente Cati, Demauto, Autoluce, Telos, Dubhe
+  - **Smart mapping destinatari**: cerca per ragione sociale + città, se non trova crea nuovo destinatario
+  - Precompilazione automatica form spedizioni con ID committente/destinatario
   - Fallback manuale in caso di errore
 
 ### Giri
@@ -174,4 +176,6 @@ shared/
 - CRUD `/api/spedizioni` - Gestione spedizioni
 - `PUT /api/spedizioni/:id/assign` - Assegna spedizione a giro
 - `PATCH /api/spedizioni/:id/stato` - Aggiorna stato spedizione (INSERITA, ASSEGNATA, IN_CONSEGNA, CONSEGNATA, PROBLEMA)
-- `POST /api/import-ddt` - Import DDT con OCR + AI (file upload multipart/form-data, max 10MB, PDF/JPG/PNG)
+- `POST /api/import-ddt` - Import DDT con OCR + AI (file upload multipart/form-data, max 25MB, PDF/JPG/PNG)
+  - Smart mapping committenti: Cati, Demauto, Autoluce, Telos, Dubhe
+  - Smart mapping/creazione destinatari automatica

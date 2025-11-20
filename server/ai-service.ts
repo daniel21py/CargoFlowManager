@@ -52,6 +52,11 @@ Regole importanti:
 - Per CAP, estrai solo le 5 cifre
 - Per provincia, estrai solo la sigla di 2 lettere (es: BG, MI, CO)
 
+REGOLE SPECIALI PER IL COMMITTENTE:
+- Se nel testo trovi uno di questi nomi: Cati, Demauto, Autoluce, Telos, Dubhe
+- Scrivi ESATTAMENTE quel nome nel campo "committente" (rispettando maiuscole/minuscole)
+- Se NON trovi nessuno di questi nomi, OMETTI completamente il campo "committente" dal JSON
+
 Testo del DDT:
 ${ocrText}`;
 

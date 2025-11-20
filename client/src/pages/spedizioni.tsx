@@ -56,6 +56,9 @@ export default function Spedizioni() {
         // Auto-populate form with imported DDT data
         setFormData(prev => ({
           ...prev,
+          // Smart mapping: usa gli ID se disponibili dal backend
+          committenteId: data.committenteId || prev.committenteId,
+          destinatarioId: data.destinatarioId || prev.destinatarioId,
           dataDDT: data.dataDDT || prev.dataDDT,
           numeroDDT: data.numeroDDT || prev.numeroDDT,
           colli: data.colli || prev.colli,
@@ -68,9 +71,18 @@ export default function Spedizioni() {
         // Clear the localStorage data after using it
         localStorage.removeItem('ddtImportData');
         
+        // Messaggio personalizzato in base al mapping
+        let message = "I dati del DDT sono stati precompilati.";
+        if (data.committenteId) {
+          message += " Committente mappato automaticamente.";
+        }
+        if (data.destinatarioId) {
+          message += " Destinatario collegato o creato.";
+        }
+        
         toast({
           title: "Dati importati",
-          description: "I dati del DDT sono stati precompilati. Completa i campi mancanti e salva.",
+          description: message,
         });
       } catch (error) {
         console.error('Errore parsing dati importati:', error);

@@ -10,15 +10,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
-      const storage = await getStorage();
-      const user = await storage.getUserByUsername(username);
+      const { username, password } = req.body ?? {};
+      const expectedUser = process.env.AUTH_USER ?? "ufficio";
+      const expectedPass = process.env.AUTH_PASS ?? "Tms2025!";
 
-      if (!user || user.password !== password) {
-        return res.status(401).json({ error: "Credenziali non valide" });
+      if (typeof username !== "string" || typeof password !== "string") {
+        return res.status(400).json({ error: "Invalid credentials" });
       }
 
-      res.json({ success: true, user: { id: user.id, username: user.username } });
+      const valid = username === expectedUser && password === expectedPass;
+
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      res.json({ success: true, user: { id: "auth-user", username: expectedUser } });
     } catch (error) {
       res.status(500).json({ error: "Errore del server" });
     }
@@ -227,6 +233,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+    app.post("/api/giri/generate", async (req, res) => {
+      try {
+        const { data } = req.body;
+        if (!data) {
+          return res.status(400).json({ error: "La data è obbligatoria" });
+        }
+
+        const storage = await getStorage();
+        const [autisti, giriEsistenti] = await Promise.all([
+          storage.getAllAutisti(),
+          storage.getGiriByData(data),
+        ]);
+
+        const existingKeys = new Set(giriEsistenti.map((g) => `${g.autistaId}-${g.turno}`));
+        let createdCount = 0;
+
+        for (const autista of autisti) {
+          if (!autista.attivo) continue;
+
+          for (const turno of ["MATTINO", "POMERIGGIO"] as const) {
+            const key = `${autista.id}-${turno}`;
+            if (existingKeys.has(key)) continue;
+
+            await storage.createGiro({
+              data,
+              turno,
+              autistaId: autista.id,
+              mezzoId: autista.mezzoPreferitoId ?? null,
+              zona: autista.zonaPrincipale,
+              note: null,
+            });
+
+            existingKeys.add(key);
+            createdCount++;
+          }
+        }
+
+        res.json({ createdCount });
+      } catch (error) {
+        console.error("Errore durante la generazione automatica dei giri:", error);
+        res.status(500).json({ error: "Errore nella generazione dei giri" });
+      }
+    });
+
   app.get("/api/giri/:id", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -326,195 +376,199 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/import-ddt", (req, res, next) => {
-    upload.single('file')(req, res, (err) => {
-      if (err) {
-        // Handle multer-specific errors
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(413).json({ 
-            error: "File troppo grande", 
-            details: "La dimensione massima consentita è 25MB",
-            allowManualEntry: true 
-          });
-        }
-        if (err.message.includes('Tipo di file non supportato')) {
-          return res.status(415).json({ 
-            error: "Tipo di file non supportato", 
+    app.post("/api/import-ddt", (req, res, next) => {
+      upload.single("file")(req, res, (err) => {
+        if (err) {
+          if (err.code === "LIMIT_FILE_SIZE") {
+            return res.status(413).json({
+              error: "File troppo grande",
+              details: "La dimensione massima consentita è 25MB",
+              allowManualEntry: true,
+            });
+          }
+          if (err.message.includes("Tipo di file non supportato")) {
+            return res.status(415).json({
+              error: "Tipo di file non supportato",
+              details: err.message,
+              allowManualEntry: true,
+            });
+          }
+          return res.status(400).json({
+            error: "Errore durante l'upload",
             details: err.message,
-            allowManualEntry: true 
+            allowManualEntry: true,
           });
         }
-        return res.status(400).json({ 
-          error: "Errore durante l'upload", 
-          details: err.message,
-          allowManualEntry: true 
-        });
-      }
-      next();
-    });
-  }, async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "Nessun file caricato" });
-      }
-
-      const fileBuffer = req.file.buffer;
-      const mimeType = req.file.mimetype;
-
-      // Server-side validation of MIME type (double-check)
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(mimeType)) {
-        return res.status(415).json({ 
-          error: "Tipo di file non valido", 
-          details: "Solo file PDF, JPG e PNG sono supportati",
-          allowManualEntry: true 
-        });
-      }
-
-      // Step 1: Extract text from file (OCR for images, text extraction for PDF)
-      let extractedText: string;
+        next();
+      });
+    }, async (req, res) => {
       try {
-        extractedText = await extractTextFromDDT(fileBuffer, mimeType);
-        console.log("Testo estratto dal DDT:", extractedText.substring(0, 200));
-      } catch (ocrError: any) {
-        console.error("Errore OCR:", ocrError);
-        return res.status(500).json({ 
-          error: "Errore durante l'estrazione del testo", 
-          details: ocrError.message,
-          allowManualEntry: true 
-        });
-      }
+        if (!req.file) {
+          return res.status(400).json({ error: "Nessun file caricato" });
+        }
 
-      // Step 2: Parse DDT data with AI
-      let ddtData;
-      try {
-        ddtData = await parseDDTWithAI(extractedText);
-        console.log("Dati estratti con AI:", ddtData);
-      } catch (aiError: any) {
-        console.error("Errore AI parsing:", aiError);
-        return res.status(500).json({ 
-          error: "Errore durante l'analisi dei dati", 
-          details: aiError.message,
-          extractedText,
-          allowManualEntry: true 
-        });
-      }
+        const fileBuffer = req.file.buffer;
+        const mimeType = req.file.mimetype;
+        const allowedTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
 
-      // Step 3: Smart mapping committente
-      const storage = await getStorage();
-      let committenteId: string | undefined;
-      
-      if (ddtData.committente) {
-        // Cerca committente per nome con matching flessibile (case-insensitive, contains)
-        const committenti = await storage.getAllCommittenti();
-        const committenteNome = ddtData.committente.toLowerCase().trim();
-        
-        // Prova prima match esatto, poi contains
-        let committenteMatch = committenti.find(c => 
-          c.nome.toLowerCase().trim() === committenteNome
-        );
-        
-        // Se non trova match esatto, prova con contains (per gestire "Cati S.p.A." → "Cati")
-        if (!committenteMatch) {
-          committenteMatch = committenti.find(c => {
-            const nome = c.nome.toLowerCase().trim();
-            return committenteNome.includes(nome) || nome.includes(committenteNome);
+        if (!allowedTypes.includes(mimeType)) {
+          return res.status(415).json({
+            error: "Tipo di file non valido",
+            details: "Solo file PDF, JPG e PNG sono supportati",
+            allowManualEntry: true,
           });
         }
-        
-        if (committenteMatch) {
-          committenteId = committenteMatch.id;
-          console.log(`Committente mappato: ${committenteMatch.nome} (ID: ${committenteId})`);
-        } else {
-          console.log(`Committente non trovato per: ${ddtData.committente}`);
-        }
-      }
 
-      // Step 4: Smart mapping/creation destinatario
-      let destinatarioId: string | undefined;
-      let destinatarioCreated = false;
-      let destinatarioError: string | undefined;
-      
-      if (ddtData.destinatario?.ragioneSociale && ddtData.destinatario?.citta) {
-        // Cerca destinatario per ragione sociale + città (case-insensitive)
-        const destinatari = await storage.getAllDestinatari();
-        const ragioneSocialeNorm = ddtData.destinatario.ragioneSociale.toLowerCase().trim();
-        const cittaNorm = ddtData.destinatario.citta.toLowerCase().trim();
-        
-        const destinatarioMatch = destinatari.find(d => 
-          d.ragioneSociale.toLowerCase().trim() === ragioneSocialeNorm &&
-          d.citta.toLowerCase().trim() === cittaNorm
-        );
-        
-        if (destinatarioMatch) {
-          // Destinatario esistente trovato
-          destinatarioId = destinatarioMatch.id;
-          console.log(`Destinatario trovato: ${destinatarioMatch.ragioneSociale} (ID: ${destinatarioId})`);
-        } else {
-          // Crea nuovo destinatario con validazione schema
+        let pageTexts: string[];
+        try {
+          pageTexts = await extractTextFromDDT(fileBuffer, mimeType);
+        } catch (ocrError: any) {
+          console.error("Errore OCR:", ocrError);
+          return res.status(500).json({
+            error: "Errore durante l'estrazione del testo",
+            details: ocrError.message,
+            allowManualEntry: true,
+          });
+        }
+
+        const pages = pageTexts
+          .map((text, idx) => ({ text: text.trim(), pageNumber: idx + 1 }))
+          .filter((page) => page.text.length > 0);
+
+        if (pages.length === 0) {
+          return res.status(400).json({
+            error: "Il file non contiene testo leggibile",
+            allowManualEntry: true,
+          });
+        }
+
+        const storage = await getStorage();
+        const committentiList = await storage.getAllCommittenti();
+        let destinatariList = await storage.getAllDestinatari();
+
+        const candidates = [];
+
+        for (const page of pages) {
           try {
-            // Validazione dati prima di creare
-            const insertData: InsertDestinatario = {
-              ragioneSociale: ddtData.destinatario.ragioneSociale.trim(),
-              indirizzo: ddtData.destinatario.indirizzo?.trim() || 'Da verificare',
-              cap: ddtData.destinatario.cap?.trim() || '00000',
-              citta: ddtData.destinatario.citta.trim(),
-              provincia: ddtData.destinatario.provincia?.trim() || 'XX',
-              zona: null, // Zona da assegnare manualmente dopo
-              note: 'Creato automaticamente da import DDT - verificare dati',
+            const ddtData = await parseDDTWithAI(page.text);
+            if (!ddtData || Object.keys(ddtData).length === 0) {
+              candidates.push({
+                pageNumber: page.pageNumber,
+                error: "Nessun dato riconosciuto nella pagina",
+              });
+              continue;
+            }
+
+            let committenteId: string | undefined;
+            let committenteMapped = false;
+
+            if (ddtData.committente) {
+              const committenteNome = ddtData.committente.toLowerCase().trim();
+              let committenteMatch =
+                committentiList.find((c) => c.nome.toLowerCase().trim() === committenteNome) ||
+                committentiList.find((c) => {
+                  const nome = c.nome.toLowerCase().trim();
+                  return committenteNome.includes(nome) || nome.includes(committenteNome);
+                });
+
+              if (committenteMatch) {
+                committenteId = committenteMatch.id;
+                committenteMapped = true;
+              }
+            }
+
+            let destinatarioId: string | undefined;
+            let destinatarioMapped = false;
+            let destinatarioCreated = false;
+            let destinatarioError: string | undefined;
+
+            if (ddtData.destinatario?.ragioneSociale && ddtData.destinatario?.citta) {
+              const ragioneSocialeNorm = ddtData.destinatario.ragioneSociale.toLowerCase().trim();
+              const cittaNorm = ddtData.destinatario.citta.toLowerCase().trim();
+
+              const destinatarioMatch = destinatariList.find(
+                (d) =>
+                  d.ragioneSociale.toLowerCase().trim() === ragioneSocialeNorm &&
+                  d.citta.toLowerCase().trim() === cittaNorm,
+              );
+
+              if (destinatarioMatch) {
+                destinatarioId = destinatarioMatch.id;
+                destinatarioMapped = true;
+              } else {
+                try {
+                  const insertData: InsertDestinatario = {
+                    ragioneSociale: ddtData.destinatario.ragioneSociale.trim(),
+                    indirizzo: ddtData.destinatario.indirizzo?.trim() || "Da verificare",
+                    cap: ddtData.destinatario.cap?.trim() || "00000",
+                    citta: ddtData.destinatario.citta.trim(),
+                    provincia: ddtData.destinatario.provincia?.trim() || "XX",
+                    zona: null,
+                    note: "Creato automaticamente da import DDT - verificare dati",
+                  };
+
+                  const validated = insertDestinatarioSchema.parse(insertData);
+                  const nuovoDestinatario = await storage.createDestinatario(validated);
+                  destinatarioId = nuovoDestinatario.id;
+                  destinatarioCreated = true;
+                  destinatariList = [...destinatariList, nuovoDestinatario];
+                } catch (createError: any) {
+                  destinatarioError = createError.message || "Impossibile creare il destinatario";
+                }
+              }
+            }
+
+            const responseData = {
+              committente: ddtData.committente,
+              destinatario: ddtData.destinatario,
+              dataDDT: ddtData.dataDDT,
+              numeroDDT: ddtData.numeroDDT,
+              colli: ddtData.colli,
+              peso: ddtData.peso,
+              contrassegno: ddtData.contrassegno,
+              committenteId: committenteId || undefined,
+              destinatarioId: destinatarioId || undefined,
             };
-            
-            // Validazione schema
-            const validated = insertDestinatarioSchema.parse(insertData);
-            const nuovoDestinatario = await storage.createDestinatario(validated);
-            
-            destinatarioId = nuovoDestinatario.id;
-            destinatarioCreated = true;
-            console.log(`Nuovo destinatario creato: ${nuovoDestinatario.ragioneSociale} (ID: ${destinatarioId})`);
-          } catch (createError: any) {
-            console.error('Errore creazione destinatario:', createError);
-            destinatarioError = createError.message || 'Impossibile creare il destinatario';
-            // Non bloccare l'import se fallisce la creazione
+
+            candidates.push({
+              pageNumber: page.pageNumber,
+              data: responseData,
+              committenteId: committenteId || null,
+              destinatarioId: destinatarioId || null,
+              metadata: {
+                committenteMapped,
+                destinatarioMapped,
+                destinatarioCreated,
+                destinatarioError,
+              },
+            });
+          } catch (pageError: any) {
+            console.error(`Errore durante l'elaborazione della pagina ${page.pageNumber}:`, pageError);
+            candidates.push({
+              pageNumber: page.pageNumber,
+              error: pageError.message || "Errore durante l'analisi della pagina",
+            });
           }
         }
-      }
 
-      // Return parsed data with mapped IDs and metadata
-      // Costruisci oggetto response esplicito per garantire presenza di tutti i campi
-      const responseData = {
-        // Dati estratti dall'AI
-        committente: ddtData.committente,
-        destinatario: ddtData.destinatario,
-        dataDDT: ddtData.dataDDT,
-        numeroDDT: ddtData.numeroDDT,
-        colli: ddtData.colli,
-        peso: ddtData.peso,
-        contrassegno: ddtData.contrassegno,
-        // ID mappati/creati
-        committenteId: committenteId || undefined,
-        destinatarioId: destinatarioId || undefined,
-      };
-      
-      res.json({
-        success: true,
-        data: responseData,
-        metadata: {
-          committenteMapped: !!committenteId,
-          destinatarioMapped: !!destinatarioId && !destinatarioCreated,
-          destinatarioCreated,
-          destinatarioError,
-        },
-        extractedText
-      });
-    } catch (error: any) {
-      console.error("Errore generale import DDT:", error);
-      res.status(500).json({ 
-        error: "Errore durante l'importazione del DDT",
-        details: error.message,
-        allowManualEntry: true 
-      });
-    }
-  });
+        res.json({
+          success: true,
+          candidates,
+          summary: {
+            totalPages: pageTexts.length,
+            processedPages: candidates.length,
+            pagesWithErrors: candidates.filter((c) => c.error).length,
+          },
+        });
+      } catch (error: any) {
+        console.error("Errore generale import DDT:", error);
+        res.status(500).json({
+          error: "Errore durante l'importazione del DDT",
+          details: error.message,
+          allowManualEntry: true,
+        });
+      }
+    });
 
   const httpServer = createServer(app);
 

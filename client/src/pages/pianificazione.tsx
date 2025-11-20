@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,41 @@ const STATI_COLORS = {
   CONSEGNATA: "bg-green-100 text-green-800 border-green-200",
   PROBLEMA: "bg-red-100 text-red-800 border-red-200",
 };
+
+type ColumnSummary = {
+  colli: number;
+  peso: number;
+  capacity?: number;
+  overCapacity: boolean;
+};
+
+const calculateSummary = (
+  spedizioni: SpedizioneWithDetails[],
+  mezzo?: GiroWithDetails["mezzo"],
+): ColumnSummary => {
+  const totals = spedizioni.reduce(
+    (acc, spedizione) => {
+      acc.colli += spedizione.colli || 0;
+      acc.peso += Number(spedizione.pesoKg) || 0;
+      return acc;
+    },
+    { colli: 0, peso: 0 },
+  );
+
+  const capacity = mezzo?.portataKg;
+  const overCapacity = typeof capacity === "number" ? totals.peso > capacity : false;
+
+  return {
+    colli: totals.colli,
+    peso: totals.peso,
+    capacity,
+    overCapacity,
+  };
+};
+
+const getTodayDateString = () => new Date().toISOString().split("T")[0];
+const getDefaultTurno = (): "MATTINO" | "POMERIGGIO" =>
+  new Date().getHours() < 12 ? "MATTINO" : "POMERIGGIO";
 
 function SpedizioneCard({ spedizione, isDragging = false }: { spedizione: SpedizioneWithDetails; isDragging?: boolean }) {
   return (
@@ -54,19 +89,23 @@ function SpedizioneCard({ spedizione, isDragging = false }: { spedizione: Spediz
   );
 }
 
-function DroppableColumn({ 
-  id, 
-  title, 
-  spedizioni, 
-  giro 
-}: { 
-  id: string; 
-  title: string; 
-  spedizioni: SpedizioneWithDetails[]; 
+function DroppableColumn({
+  id,
+  title,
+  spedizioni,
+  giro,
+  summary,
+}: {
+  id: string;
+  title: string;
+  spedizioni: SpedizioneWithDetails[];
   giro?: GiroWithDetails;
+  summary?: ColumnSummary;
 }) {
+  const cardClasses = `flex-shrink-0 w-80 ${summary?.overCapacity ? "border border-destructive/60" : ""}`;
+
   return (
-    <Card className="flex-shrink-0 w-80">
+    <Card className={cardClasses}>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           {id === "unassigned" ? (
@@ -83,12 +122,29 @@ function DroppableColumn({
         </CardTitle>
         {giro && (
           <div className="text-xs text-muted-foreground space-y-1">
-            <p>{giro.autista.nome} {giro.autista.cognome}</p>
-            <p>{giro.mezzo.targa} - {giro.mezzo.modello}</p>
+            <p>
+              {giro.autista.nome} {giro.autista.cognome}
+            </p>
+            <p>{giro.mezzo ? `${giro.mezzo.targa} - ${giro.mezzo.modello}` : "Mezzo non assegnato"}</p>
           </div>
         )}
-        <div className="text-sm font-medium pt-1">
-          {spedizioni.length} spedizioni
+        <div className="text-sm font-medium pt-1 space-y-0.5">
+          <div>{spedizioni.length} spedizioni</div>
+          {summary && (
+            <div className="text-xs text-muted-foreground">
+              {summary.colli} colli · {summary.peso.toFixed(0)} kg
+            </div>
+          )}
+          {summary?.capacity && (
+            <div className={`text-xs ${summary.overCapacity ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+              Peso vs portata: {summary.peso.toFixed(0)} / {summary.capacity} kg
+            </div>
+          )}
+          {summary?.overCapacity && (
+            <p className="text-xs text-destructive font-semibold flex items-center gap-1">
+              Superata portata del mezzo
+            </p>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -119,8 +175,8 @@ function DroppableColumn({
 
 export default function Pianificazione() {
   const { toast } = useToast();
-  const [selectedData, setSelectedData] = useState(new Date().toISOString().split("T")[0]);
-  const [selectedTurno, setSelectedTurno] = useState<"MATTINO" | "POMERIGGIO">("MATTINO");
+  const [selectedData, setSelectedData] = useState(getTodayDateString);
+  const [selectedTurno, setSelectedTurno] = useState<"MATTINO" | "POMERIGGIO">(getDefaultTurno);
 
   const { data: spedizioni, isLoading: isLoadingSpedizioni } = useQuery<SpedizioneWithDetails[]>({
     queryKey: ["/api/spedizioni"],
@@ -133,17 +189,41 @@ export default function Pianificazione() {
   const assignMutation = useMutation({
     mutationFn: ({ spedizioneId, giroId }: { spedizioneId: string; giroId: string | null }) =>
       apiRequest("PUT", `/api/spedizioni/${spedizioneId}/assign`, { giroId }),
+    onMutate: async ({ spedizioneId, giroId }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/spedizioni"] });
+      const previous = queryClient.getQueryData<SpedizioneWithDetails[]>(["/api/spedizioni"]);
+
+      if (previous) {
+        const optimistic = previous.map((spedizione) =>
+          spedizione.id === spedizioneId
+            ? {
+                ...spedizione,
+                giroId,
+                stato: giroId ? "ASSEGNATA" : "INSERITA",
+              }
+            : spedizione,
+        );
+        queryClient.setQueryData(["/api/spedizioni"], optimistic);
+      }
+
+      return { previous };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/spedizioni"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       toast({ title: "Spedizione assegnata con successo" });
     },
-    onError: () => {
-      toast({ 
-        title: "Errore", 
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/spedizioni"], context.previous);
+      }
+      toast({
+        title: "Errore",
         description: "Impossibile assegnare la spedizione",
-        variant: "destructive" 
+        variant: "destructive",
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/spedizioni"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
     },
   });
 
@@ -161,11 +241,39 @@ export default function Pianificazione() {
   };
 
   const giriFiltered = giri?.filter((g) => g.turno === selectedTurno) || [];
-  
-  const spedizioniNonAssegnate = spedizioni?.filter((s) => !s.giroId) || [];
-  
+
+  const spedizioniNonAssegnate = useMemo(
+    () => spedizioni?.filter((s) => !s.giroId) || [],
+    [spedizioni],
+  );
+
+  const spedizioniByGiro = useMemo(() => {
+    const map: Record<string, SpedizioneWithDetails[]> = {};
+    (spedizioni || []).forEach((spedizione) => {
+      if (!spedizione.giroId) return;
+      if (!map[spedizione.giroId]) {
+        map[spedizione.giroId] = [];
+      }
+      map[spedizione.giroId].push(spedizione);
+    });
+    return map;
+  }, [spedizioni]);
+
+  const columnSummaries = useMemo(() => {
+    const summaries: Record<string, ColumnSummary> = {};
+    (giri || []).forEach((giroItem) => {
+      summaries[giroItem.id] = calculateSummary(spedizioniByGiro[giroItem.id] || [], giroItem.mezzo);
+    });
+    return summaries;
+  }, [giri, spedizioniByGiro]);
+
+  const unassignedSummary = useMemo(
+    () => calculateSummary(spedizioniNonAssegnate),
+    [spedizioniNonAssegnate],
+  );
+
   const getSpedizioniForGiro = (giroId: string) => {
-    return spedizioni?.filter((s) => s.giroId === giroId) || [];
+    return spedizioniByGiro[giroId] || [];
   };
 
   const isLoading = isLoadingSpedizioni || isLoadingGiri;
@@ -221,48 +329,51 @@ export default function Pianificazione() {
             </Card>
           ))}
         </div>
-      ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          <div 
-            onDrop={(e) => handleDrop(e, null)}
-            onDragOver={handleDragOver}
-            data-testid="column-unassigned"
-          >
-            <DroppableColumn
-              id="unassigned"
-              title="Non Assegnate"
-              spedizioni={spedizioniNonAssegnate}
-            />
-          </div>
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            <div
+              onDrop={(e) => handleDrop(e, null)}
+              onDragOver={handleDragOver}
+              data-testid="column-unassigned"
+            >
+              <DroppableColumn
+                id="unassigned"
+                title="Non Assegnate"
+                spedizioni={spedizioniNonAssegnate}
+                summary={unassignedSummary}
+              />
+            </div>
 
-          {giriFiltered.length === 0 ? (
-            <Card className="flex-shrink-0 w-80">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Truck className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-sm text-muted-foreground text-center">
-                  Nessun giro creato per {selectedTurno.toLowerCase()} del {new Date(selectedData).toLocaleDateString("it-IT")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            giriFiltered.map((giro) => (
-              <div 
-                key={giro.id}
-                onDrop={(e) => handleDrop(e, giro.id)}
-                onDragOver={handleDragOver}
-                data-testid={`column-giro-${giro.id}`}
-              >
-                <DroppableColumn
-                  id={giro.id}
-                  title={`${giro.autista.nome} ${giro.autista.cognome}`}
-                  spedizioni={getSpedizioniForGiro(giro.id)}
-                  giro={giro}
-                />
-              </div>
-            ))
-          )}
-        </div>
-      )}
+            {giriFiltered.length === 0 ? (
+              <Card className="flex-shrink-0 w-80">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Truck className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground text-center">
+                    Nessun giro creato per {selectedTurno.toLowerCase()} del{" "}
+                    {new Date(selectedData).toLocaleDateString("it-IT")}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              giriFiltered.map((giro) => (
+                <div
+                  key={giro.id}
+                  onDrop={(e) => handleDrop(e, giro.id)}
+                  onDragOver={handleDragOver}
+                  data-testid={`column-giro-${giro.id}`}
+                >
+                  <DroppableColumn
+                    id={giro.id}
+                    title={`${giro.autista.nome} ${giro.autista.cognome}`}
+                    spedizioni={getSpedizioniForGiro(giro.id)}
+                    giro={giro}
+                    summary={columnSummaries[giro.id]}
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        )}
     </div>
   );
 }

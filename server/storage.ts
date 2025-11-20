@@ -204,13 +204,23 @@ export class MemStorage implements IStorage {
 
   async createAutista(insertAutista: InsertAutista): Promise<Autista> {
     const id = randomUUID();
-    const autista: Autista = { ...insertAutista, id, attivo: insertAutista.attivo ?? true };
+    const autista: Autista = { 
+      ...insertAutista, 
+      id, 
+      attivo: insertAutista.attivo ?? true,
+      mezzoPreferitoId: insertAutista.mezzoPreferitoId ?? null,
+    };
     this.autisti.set(id, autista);
     return autista;
   }
 
   async updateAutista(id: string, insertAutista: InsertAutista): Promise<Autista> {
-    const autista: Autista = { ...insertAutista, id, attivo: insertAutista.attivo ?? true };
+    const autista: Autista = { 
+      ...insertAutista, 
+      id, 
+      attivo: insertAutista.attivo ?? true,
+      mezzoPreferitoId: insertAutista.mezzoPreferitoId ?? null,
+    };
     this.autisti.set(id, autista);
     return autista;
   }
@@ -255,10 +265,10 @@ export class MemStorage implements IStorage {
     
     return giriArray.map((giro) => {
       const autista = this.autisti.get(giro.autistaId);
-      const mezzo = this.mezzi.get(giro.mezzoId);
+      const mezzo = giro.mezzoId ? this.mezzi.get(giro.mezzoId) ?? null : null;
       
-      if (!autista || !mezzo) {
-        throw new Error("Autista or Mezzo not found for giro");
+      if (!autista) {
+        throw new Error("Autista not found for giro");
       }
       
       return {
@@ -274,10 +284,10 @@ export class MemStorage implements IStorage {
     if (!giro) return undefined;
     
     const autista = this.autisti.get(giro.autistaId);
-    const mezzo = this.mezzi.get(giro.mezzoId);
+    const mezzo = giro.mezzoId ? this.mezzi.get(giro.mezzoId) ?? null : null;
     
-    if (!autista || !mezzo) {
-      throw new Error("Autista or Mezzo not found for giro");
+    if (!autista) {
+      throw new Error("Autista not found for giro");
     }
     
     const spedizioniArray = Array.from(this.spedizioni.values()).filter(s => s.giroId === id);
@@ -307,7 +317,13 @@ export class MemStorage implements IStorage {
 
   async createGiro(insertGiro: InsertGiro): Promise<Giro> {
     const id = randomUUID();
-    const giro: Giro = { ...insertGiro, id, zona: insertGiro.zona ?? null, note: insertGiro.note ?? null };
+    const giro: Giro = { 
+      ...insertGiro, 
+      id, 
+      mezzoId: insertGiro.mezzoId ?? null,
+      zona: insertGiro.zona ?? null, 
+      note: insertGiro.note ?? null 
+    };
     this.giri.set(id, giro);
     return giro;
   }

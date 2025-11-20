@@ -68,7 +68,7 @@ export default function StampaDDT() {
     );
   }
 
-  if (!giro || !giro.autista || !giro.mezzo) {
+  if (!giro || !giro.autista) {
     return (
       <div className="p-8">
         <p className="text-center text-muted-foreground">
@@ -134,20 +134,21 @@ export default function StampaDDT() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <h2 className="font-semibold text-lg border-b pb-1">Mezzo</h2>
-            <div className="space-y-1">
-              <p>
-                <span className="font-medium">Targa:</span> {giro.mezzo?.targa}
-              </p>
-              <p>
-                <span className="font-medium">Modello:</span> {giro.mezzo?.modello}
-              </p>
-              <p>
-                <span className="font-medium">Portata:</span> {giro.mezzo?.portataKg} kg
-              </p>
+            <div className="space-y-3">
+              <h2 className="font-semibold text-lg border-b pb-1">Mezzo</h2>
+              <div className="space-y-1">
+                <p>
+                  <span className="font-medium">Targa:</span> {giro.mezzo?.targa ?? "Non assegnato"}
+                </p>
+                <p>
+                  <span className="font-medium">Modello:</span> {giro.mezzo?.modello ?? "—"}
+                </p>
+                <p>
+                  <span className="font-medium">Portata:</span>{" "}
+                  {giro.mezzo?.portataKg ? `${giro.mezzo?.portataKg} kg` : "—"}
+                </p>
+              </div>
             </div>
-          </div>
         </div>
 
         {giro.zona && (

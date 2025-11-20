@@ -18,6 +18,7 @@ const Giri = lazy(() => import("@/pages/giri"));
 const Pianificazione = lazy(() => import("@/pages/pianificazione"));
 const StampaDDT = lazy(() => import("@/pages/stampa-ddt"));
 const ImportaDDT = lazy(() => import("@/pages/importa-ddt"));
+const RiepilogoCommittenti = lazy(() => import("@/pages/riepilogo-committenti"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -70,6 +71,9 @@ function Router() {
       </Route>
       <Route path="/importa-ddt">
         <ProtectedRoute component={ImportaDDT} />
+      </Route>
+      <Route path="/riepilogo-committenti">
+        <ProtectedRoute component={RiepilogoCommittenti} />
       </Route>
       <Route component={NotFound} />
     </Switch>

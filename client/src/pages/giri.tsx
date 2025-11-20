@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Plus, Calendar as CalendarIcon, Clock, Printer } from "lucide-react";
+import { Truck, Plus, Calendar as CalendarIcon, Clock, Printer, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,6 +61,32 @@ export default function Giri() {
     },
   });
 
+  const generateMutation = useMutation({
+    mutationFn: async (date: string) => {
+      const res = await apiRequest("POST", "/api/giri/generate", { data: date });
+      const body = await res.json();
+      return body as { createdCount: number };
+    },
+    onSuccess: (result, date) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/giri/by-date"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({
+        title: result.createdCount > 0 ? "Giri generati" : "Nessun giro creato",
+        description:
+          result.createdCount > 0
+            ? `${result.createdCount} giri creati per il ${new Date(date).toLocaleDateString("it-IT")}`
+            : "Tutti gli autisti attivi avevano già i giri per la data selezionata",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Errore",
+        description: "Impossibile generare i giri automaticamente",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       data: new Date().toISOString().split("T")[0],
@@ -75,7 +101,11 @@ export default function Giri() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(formData);
+    const payload: InsertGiro = {
+      ...formData,
+      mezzoId: formData.mezzoId || null,
+    };
+    createMutation.mutate(payload);
   };
 
   const handleDelete = (id: string) => {
@@ -88,16 +118,27 @@ export default function Giri() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Giri</h1>
-          <p className="text-muted-foreground mt-1">Gestione giri giornalieri</p>
-        </div>
+    <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <h1 className="text-2xl font-semibold">Giri</h1>
+        <p className="text-muted-foreground mt-1">Gestione giri giornalieri</p>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
         <Button onClick={() => setIsDialogOpen(true)} data-testid="button-new-giro">
           <Plus className="mr-2 h-4 w-4" />
           Nuovo Giro
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => generateMutation.mutate(filterData)}
+          disabled={generateMutation.isPending}
+          data-testid="button-generate-giri"
+        >
+          {generateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Genera giri per la data
+        </Button>
       </div>
+    </div>
 
       <Card>
         <CardContent className="p-4">
@@ -143,9 +184,7 @@ export default function Giri() {
                 <TableBody>
                   {giri.map((giro) => (
                     <TableRow key={giro.id} className="hover-elevate" data-testid={`row-giro-${giro.id}`}>
-                      <TableCell>
-                        {format(new Date(giro.data), "dd/MM/yyyy", { locale: it })}
-                      </TableCell>
+                      <TableCell>{format(new Date(giro.data), "dd/MM/yyyy", { locale: it })}</TableCell>
                       <TableCell>
                         <Badge variant={giro.turno === "MATTINO" ? "default" : "secondary"}>
                           <Clock className="mr-1 h-3 w-3" />
@@ -154,14 +193,18 @@ export default function Giri() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{giro.autista.nome} {giro.autista.cognome}</p>
+                          <p className="font-medium">
+                            {giro.autista.nome} {giro.autista.cognome}
+                          </p>
                           <p className="text-xs text-muted-foreground">{giro.autista.telefono}</p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{giro.mezzo.targa}</p>
-                          <p className="text-xs text-muted-foreground">{giro.mezzo.modello}</p>
+                          <p className="font-medium">{giro.mezzo ? giro.mezzo.targa : "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {giro.mezzo ? giro.mezzo.modello : "Mezzo non assegnato"}
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell>{giro.zona || "-"}</TableCell>
@@ -171,11 +214,7 @@ export default function Giri() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Link href={`/stampa-ddt/${giro.id}`}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              data-testid={`button-print-${giro.id}`}
-                            >
+                            <Button size="sm" variant="outline" data-testid={`button-print-${giro.id}`}>
                               <Printer className="mr-1 h-3 w-3" />
                               Distinta Giornaliera
                             </Button>
@@ -243,37 +282,45 @@ export default function Giri() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="autistaId">Autista *</Label>
-              <Select value={formData.autistaId} onValueChange={(value) => setFormData({ ...formData, autistaId: value })} required>
-                <SelectTrigger data-testid="select-autista">
-                  <SelectValue placeholder="Seleziona autista" />
-                </SelectTrigger>
-                <SelectContent>
-                  {autistiAttivi?.map((autista) => (
-                    <SelectItem key={autista.id} value={autista.id}>
-                      {autista.nome} {autista.cognome} - {autista.zonaPrincipale}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="autistaId">Autista *</Label>
+                <Select
+                  value={formData.autistaId}
+                  onValueChange={(value) => setFormData({ ...formData, autistaId: value })}
+                  required
+                >
+                  <SelectTrigger data-testid="select-autista">
+                    <SelectValue placeholder="Seleziona autista" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {autistiAttivi?.map((autista) => (
+                      <SelectItem key={autista.id} value={autista.id}>
+                        {autista.nome} {autista.cognome} - {autista.zonaPrincipale}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="mezzoId">Mezzo *</Label>
-              <Select value={formData.mezzoId} onValueChange={(value) => setFormData({ ...formData, mezzoId: value })} required>
-                <SelectTrigger data-testid="select-mezzo">
-                  <SelectValue placeholder="Seleziona mezzo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mezzi?.map((mezzo) => (
-                    <SelectItem key={mezzo.id} value={mezzo.id}>
-                      {mezzo.targa} - {mezzo.modello} (Portata: {mezzo.portataKg} kg)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="mezzoId">Mezzo</Label>
+                <Select
+                  value={formData.mezzoId || "NONE"}
+                  onValueChange={(value) => setFormData({ ...formData, mezzoId: value === "NONE" ? "" : value })}
+                >
+                  <SelectTrigger data-testid="select-mezzo">
+                    <SelectValue placeholder="Seleziona mezzo (opzionale)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Nessun mezzo</SelectItem>
+                    {mezzi?.map((mezzo) => (
+                      <SelectItem key={mezzo.id} value={mezzo.id}>
+                        {mezzo.targa} - {mezzo.modello} (Portata: {mezzo.portataKg} kg)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
             <div className="space-y-2">
               <Label htmlFor="zona">Zona</Label>

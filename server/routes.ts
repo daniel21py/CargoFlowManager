@@ -10,15 +10,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
-      const storage = await getStorage();
-      const user = await storage.getUserByUsername(username);
+      const { username, password } = req.body ?? {};
+      const expectedUser = process.env.AUTH_USER ?? "ufficio";
+      const expectedPass = process.env.AUTH_PASS ?? "Tms2025!";
 
-      if (!user || user.password !== password) {
-        return res.status(401).json({ error: "Credenziali non valide" });
+      if (typeof username !== "string" || typeof password !== "string") {
+        return res.status(400).json({ error: "Invalid credentials" });
       }
 
-      res.json({ success: true, user: { id: user.id, username: user.username } });
+      const valid = username === expectedUser && password === expectedPass;
+
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      res.json({ success: true, user: { id: "auth-user", username: expectedUser } });
     } catch (error) {
       res.status(500).json({ error: "Errore del server" });
     }

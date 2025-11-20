@@ -30,6 +30,34 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("scheduler")) {
+              return "react-vendors";
+            }
+            if (id.includes("@tanstack/react-query")) {
+              return "react-query";
+            }
+            if (id.includes("wouter")) {
+              return "routing";
+            }
+            if (
+              id.includes("@radix-ui") ||
+              id.includes("lucide-react") ||
+              id.includes("class-variance-authority") ||
+              id.includes("cmdk")
+            ) {
+              return "ui-kit";
+            }
+            if (id.includes("date-fns")) {
+              return "date-fns";
+            }
+          }
+        },
+      },
+    },
   },
   server: {
     fs: {

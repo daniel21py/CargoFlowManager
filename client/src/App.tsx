@@ -5,20 +5,20 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 
-import Login from "@/pages/login";
-import Dashboard from "@/pages/dashboard";
-import Committenti from "@/pages/committenti";
-import Destinatari from "@/pages/destinatari";
-import Autisti from "@/pages/autisti";
-import Mezzi from "@/pages/mezzi";
-import Spedizioni from "@/pages/spedizioni";
-import Giri from "@/pages/giri";
-import Pianificazione from "@/pages/pianificazione";
-import StampaDDT from "@/pages/stampa-ddt";
-import ImportaDDT from "@/pages/importa-ddt";
-import NotFound from "@/pages/not-found";
+const Login = lazy(() => import("@/pages/login"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const Committenti = lazy(() => import("@/pages/committenti"));
+const Destinatari = lazy(() => import("@/pages/destinatari"));
+const Autisti = lazy(() => import("@/pages/autisti"));
+const Mezzi = lazy(() => import("@/pages/mezzi"));
+const Spedizioni = lazy(() => import("@/pages/spedizioni"));
+const Giri = lazy(() => import("@/pages/giri"));
+const Pianificazione = lazy(() => import("@/pages/pianificazione"));
+const StampaDDT = lazy(() => import("@/pages/stampa-ddt"));
+const ImportaDDT = lazy(() => import("@/pages/importa-ddt"));
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const [, navigate] = useLocation();
@@ -76,12 +76,28 @@ function Router() {
   );
 }
 
+function RouterFallback() {
+  return (
+    <div className="flex min-h-[200px] w-full items-center justify-center p-6 text-muted-foreground">
+      Caricamento in corso...
+    </div>
+  );
+}
+
+function SuspendedRouter() {
+  return (
+    <Suspense fallback={<RouterFallback />}>
+      <Router />
+    </Suspense>
+  );
+}
+
 function AppContent() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
 
   if (isLoginPage) {
-    return <Router />;
+    return <SuspendedRouter />;
   }
 
   const style = {
@@ -98,7 +114,7 @@ function AppContent() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
           </header>
           <main className="flex-1 overflow-auto">
-            <Router />
+            <SuspendedRouter />
           </main>
         </div>
       </div>

@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import type { SpedizioneWithDetails, GiroWithDetails } from "@shared/schema";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 
 const STATI_COLORS = {
   INSERITA: "bg-blue-100 text-blue-800 border-blue-200",
